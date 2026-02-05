@@ -13,7 +13,7 @@
     <artifactId>main-service</artifactId>
     <packaging>jar</packaging>
 
-    <name>Main Service</name>
+    <name>main-service</name>
 
     <dependencies>
         <dependency>

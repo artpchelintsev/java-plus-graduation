@@ -4,7 +4,7 @@ spring:
   main:
     banner-mode: OFF
   config:
-    import: "configserver:"
+    import: "optional:configserver:"
   cloud:
     config:
       discovery:
