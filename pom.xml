@@ -19,7 +19,8 @@
 
     <modules>
         <module>stats</module>
-        <module>main-service</module>
+        <module>core</module>
+        <module>infra</module>
     </modules>
 
     <properties>
@@ -32,7 +33,20 @@
         <jakarta-persistence-api.version>3.2.0</jakarta-persistence-api.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <mapstruct-binding.version>0.2.0</mapstruct-binding.version>
+        <spring-cloud-dependencies.version>2023.0.3</spring-cloud-dependencies.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud-dependencies.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
