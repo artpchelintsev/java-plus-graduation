@@ -24,7 +24,7 @@ public class StatsClient {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final RestClient restClient;
 
-    public StatsClient(@Value("${STATS_SERVER_URL:http://stats-server:8080}") String serverUrl) {
+    public StatsClient(@Value("${STATS_SERVER_URL:http://stats-server:9090}") String serverUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(serverUrl)
                 .build();
