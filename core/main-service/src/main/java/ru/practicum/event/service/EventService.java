@@ -6,12 +6,12 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import ru.practicum.event.dto.*;
 import ru.practicum.client.StatsClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.event.dao.EventRepository;
+import ru.practicum.event.dto.*;
 import ru.practicum.event.dto.enums.AdminStateAction;
 import ru.practicum.event.dto.enums.EventSort;
 import ru.practicum.event.dto.enums.UserStateAction;
@@ -169,13 +169,15 @@ public class EventService {
 
     public EventFullDto findPublicEventById(long id) {
         Event event = findByPublicId(id);
-
         EventFullDto dto = eventMapper.toEventFullDto(event);
+
         if (dto != null) {
-            saveHit();
             String uri = "/events/" + dto.getId();
+
             Map<String, Long> hits = fetchHitsForUris(List.of(uri));
             dto.setViews(hits.getOrDefault(uri, 0L));
+
+            saveHit();
         }
 
         return dto;

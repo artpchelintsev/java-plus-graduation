@@ -2,19 +2,25 @@ package ru.practicum.client;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.MaxAttemptsRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 import ru.practicum.client.exception.StatsClientException;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 
-import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -22,73 +28,94 @@ import java.util.List;
 public class StatsClient {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private final RestClient restClient;
 
-    public StatsClient(@Value("${STATS_SERVER_URL:http://stats-server:9090}") String serverUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(serverUrl)
-                .build();
+    private final DiscoveryClient discoveryClient;
+    private final RestTemplate restTemplate;
+    private final RetryTemplate retryTemplate;
+    private final String statsServiceId;
+
+    public StatsClient(DiscoveryClient discoveryClient,
+                       RestTemplate restTemplate,
+                       @Value("${stats-server.service-id:stats-server}") String statsServiceId) {
+        this.discoveryClient = discoveryClient;
+        this.restTemplate = restTemplate;
+        this.statsServiceId = statsServiceId;
+        this.retryTemplate = createRetryTemplate();
+    }
+
+    private RetryTemplate createRetryTemplate() {
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
+        backOffPolicy.setBackOffPeriod(3000L);
+        retryTemplate.setBackOffPolicy(backOffPolicy);
+
+        MaxAttemptsRetryPolicy retryPolicy = new MaxAttemptsRetryPolicy();
+        retryPolicy.setMaxAttempts(3);
+        retryTemplate.setRetryPolicy(retryPolicy);
+
+        return retryTemplate;
+    }
+
+    private ServiceInstance getInstance() {
+        try {
+            return discoveryClient
+                    .getInstances(statsServiceId)
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new StatsClientException("No instances of " + statsServiceId + " found"));
+        } catch (Exception e) {
+            throw new StatsClientException("Ошибка обнаружения адреса сервиса статистики с id: " + statsServiceId, e);
+        }
+    }
+
+    private URI makeUri(String path) {
+        ServiceInstance instance = retryTemplate.execute(ctx -> getInstance());
+        return URI.create("http://" + instance.getHost() + ":" + instance.getPort() + path);
     }
 
     public void saveHit(EndpointHitDto hitDto) {
         try {
-            handleErrors(restClient.post()
-                    .uri("/hit")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(hitDto))
-                    .toBodilessEntity();
-        } catch (RestClientException e) {
-            log.error("Не удалось отправить хит в StatsService", e);
-            throw new StatsClientException("Не удалось отправить хит в StatsService", e);
-        }
-    }
+            URI uri = makeUri("/hit");
+            log.info("Отправка хита на {}: {}", uri, hitDto.getUri());
 
-    public List<ViewStatsDto> getStats(LocalDateTime start,
-                                       LocalDateTime end,
-                                       List<String> uris,
-                                       boolean unique) {
-        try {
-            return handleErrors(restClient.get()
-                    .uri(uriBuilder -> {
-                        uriBuilder.path("/stats")
-                                .queryParam("start", start.format(FORMATTER))
-                                .queryParam("end", end.format(FORMATTER))
-                                .queryParam("unique", unique);
-                        if (uris != null && !uris.isEmpty()) {
-                            for (String u : uris) {
-                                uriBuilder.queryParam("uris", u);
-                            }
-                        }
-                        return uriBuilder.build();
-                    }))
-                    .body(new org.springframework.core.ParameterizedTypeReference<List<ViewStatsDto>>() {
-                    });
-        } catch (RestClientException e) {
-            log.error("Не удалось получить статистику из StatsService", e);
-            throw new StatsClientException("Не удалось получить статистику из StatsService", e);
-        }
-    }
+            HttpEntity<EndpointHitDto> request = new HttpEntity<>(hitDto);
+            restTemplate.postForEntity(uri, request, Void.class);
 
-    private RestClient.ResponseSpec handleErrors(RestClient.RequestHeadersSpec<?> request) {
-        return request.retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                    String errorBody = readBodyAsString(res);
-                    throw new StatsClientException("Ошибка клиента (4xx) при обращении к StatsService: "
-                            + (errorBody.isBlank() ? "сообщение ошибки не предоставлено" : errorBody));
-                })
-                .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                    String errorBody = readBodyAsString(res);
-                    throw new StatsClientException("Ошибка сервера (5xx) в StatsService: "
-                            + (errorBody.isBlank() ? "сообщение ошибки не предоставлено" : errorBody));
-                });
-    }
-
-    private String readBodyAsString(ClientHttpResponse res) {
-        try (var reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(res.getBody(), StandardCharsets.UTF_8))) {
-            return reader.lines().collect(java.util.stream.Collectors.joining("\n"));
+            log.info("Хит успешно сохранен");
         } catch (Exception e) {
-            return "не удалось прочитать тело ответа";
+            log.error("Не удалось отправить хит в StatsService", e);
+        }
+    }
+
+    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
+        try {
+            String path = String.format("/stats?start=%s&end=%s&unique=%s",
+                    start.format(FORMATTER),
+                    end.format(FORMATTER),
+                    unique);
+
+            if (uris != null && !uris.isEmpty()) {
+                path += "&uris=" + String.join(",", uris);
+            }
+
+            URI uri = makeUri(path);
+            log.info("Запрос статистики: {}", uri);
+
+            ResponseEntity<List<ViewStatsDto>> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<ViewStatsDto>>() {}
+            );
+
+            List<ViewStatsDto> stats = response.getBody() != null ? response.getBody() : Collections.emptyList();
+            log.info("Получена статистика: {}", stats);
+
+            return stats;
+        } catch (Exception e) {
+            log.error("Не удалось получить статистику из StatsService", e);
+            return Collections.emptyList();
         }
     }
 }
