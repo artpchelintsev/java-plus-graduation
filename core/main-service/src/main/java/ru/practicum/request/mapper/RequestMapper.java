@@ -1,0 +1,26 @@
+package ru.practicum.request.mapper;
+
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import ru.practicum.event.model.Event;
+import ru.practicum.request.dto.RequestDto;
+import ru.practicum.request.model.Request;
+import ru.practicum.request.model.RequestStatus;
+import ru.practicum.user.model.User;
+
+import java.util.List;
+
+@Mapper(componentModel = "spring")
+public interface RequestMapper {
+
+    @Mapping(target = "event", source = "event.id")
+    @Mapping(target = "requester", source = "requester.id")
+    @Mapping(target = "status", expression = "java(request.getStatus().name())")
+    RequestDto toDto(Request request);
+
+    List<RequestDto> toDtoList(List<Request> requests);
+
+    @Mapping(target = "id", ignore = true)
+    Request toNewEntity(Event event, User requester, RequestStatus status);
+
+}

@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.json.JacksonTester;
 import org.springframework.test.context.ContextConfiguration;
-import ru.yandex.practicum.dto.EndpointHitDto;
+import ru.practicum.dto.EndpointHitDto;
 
 import java.time.LocalDateTime;
 

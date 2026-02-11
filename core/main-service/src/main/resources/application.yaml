@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: main-service
+  main:
+    banner-mode: OFF
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        serviceId: config-server
+      fail-fast: true
+      retry:
+        initial-interval: 1000
+        max-interval: 30000
+        multiplier: 1.2
+        max-attempts: 30
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${random.value}
+    leaseRenewalIntervalInSeconds: 10
+
+stats-server:
+  service-id: stats-server
+
+logging:
+  level:
+    ru.practicum.client: DEBUG
+    ru.practicum.event.service: DEBUG
