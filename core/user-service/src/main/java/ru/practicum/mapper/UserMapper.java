@@ -5,8 +5,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import ru.practicum.dto.NewUserRequest;
-import ru.practicum.dto.UserDto;
-import ru.practicum.dto.UserShortDto;
+import ru.practicum.dto.user.UserDto;
+import ru.practicum.dto.user.UserShortDto;
 import ru.practicum.model.User;
 
 @Mapper(componentModel = "spring")

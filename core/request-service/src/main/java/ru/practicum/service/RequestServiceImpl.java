@@ -3,6 +3,7 @@ package ru.practicum.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.event.dao.EventRepository;
 import ru.practicum.event.model.Event;
@@ -30,8 +31,8 @@ import java.util.*;
 public class RequestServiceImpl implements RequestService {
 
     private final RequestRepository requestRepository;
-    private final UserRepository userRepository;
-    private final EventRepository eventRepository;
+    private final UserFeignClient userRepository;
+    private final EventFeignClient eventRepository;
     private final RequestMapper mapper;
     private final EntityValidator entityValidator;
 

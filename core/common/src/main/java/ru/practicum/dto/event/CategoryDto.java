@@ -1,13 +1,13 @@
-package ru.practicum.dto;
+package ru.practicum.dto.event;
 
 import lombok.*;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserDto {
+public class CategoryDto {
     private Long id;
-    private String email;
     private String name;
 }

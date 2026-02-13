@@ -6,15 +6,19 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.common.EntityValidator;
+import ru.practicum.dto.user.UserBatchDto;
+import ru.practicum.dto.user.UserDto;
+import ru.practicum.dto.user.UserShortDto;
 import ru.practicum.exception.ValidationException;
 import ru.practicum.dto.NewUserRequest;
 import ru.practicum.dto.PageParams;
-import ru.practicum.dto.UserDto;
 import ru.practicum.mapper.UserMapper;
 import ru.practicum.model.User;
 import ru.practicum.repository.UserRepository;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -46,7 +50,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserDto> getUsers(List<Long> ids, PageParams pageParams) {
-    PageRequest pageable = PageRequest.of(pageParams.getPageNumber(), Math.max(1, pageParams.getSize()), Sort.by("id").ascending());
+        PageRequest pageable = PageRequest.of(pageParams.getPageNumber(), Math.max(1, pageParams.getSize()), Sort.by("id").ascending());
         List<User> users;
         if (ids != null && !ids.isEmpty()) {
             users = userRepository.findAllByIdIn(ids, pageable);
@@ -95,5 +99,29 @@ public class UserServiceImpl implements UserService {
                 throw new ValidationException("Email должен быть уникальным!");
             }
         });
+    }
+
+    @Override
+    public UserBatchDto getUsersByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return UserBatchDto.builder()
+                    .users(new HashMap<>())
+                    .build();
+        }
+
+        List<User> users = userRepository.findAllById(userIds);
+
+        Map<Long, UserShortDto> userMap = users.stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        user -> UserShortDto.builder()
+                                .id(user.getId())
+                                .name(user.getName())
+                                .build()
+                ));
+
+        return UserBatchDto.builder()
+                .users(userMap)
+                .build();
     }
 }

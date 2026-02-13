@@ -1,12 +1,7 @@
 package ru.practicum.model;
 
-import lombok.*;
-
 import jakarta.persistence.*;
-import ru.practicum.event.model.Event;
-
-import java.util.ArrayList;
-import java.util.List;
+import lombok.*;
 
 @Entity
 @Table(name = "compilations")
@@ -25,13 +20,4 @@ public class Compilation {
 
     @Column(name = "pinned", nullable = false)
     private Boolean pinned;
-
-    @ManyToMany
-    @JoinTable(
-            name = "compilation_events",
-            joinColumns = @JoinColumn(name = "compilation_id"),
-            inverseJoinColumns = @JoinColumn(name = "event_id")
-    )
-    @Builder.Default
-    private List<Event> events = new ArrayList<>();
 }

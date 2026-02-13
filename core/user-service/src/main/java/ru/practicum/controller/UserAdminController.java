@@ -6,8 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.NewUserRequest;
 import ru.practicum.dto.PageParams;
-import ru.practicum.dto.UserDto;
+import ru.practicum.dto.user.UserBatchDto;
 import ru.practicum.service.UserService;
+import ru.practicum.dto.user.UserDto;
 
 import java.util.List;
 
@@ -45,8 +46,13 @@ public class UserAdminController {
         userService.deleteUser(userId);
     }
 
-    @PatchMapping("/{userId}")
+    @PutMapping("/{userId}")
     public UserDto updateUser(@PathVariable Long userId, @RequestBody UserDto userDto) {
         return userService.updateUser(userId, userDto);
+    }
+
+    @PostMapping("/batch")
+    public UserBatchDto getUsersByIds(@RequestBody List<Long> userIds) {
+        return userService.getUsersByIds(userIds);
     }
 }
