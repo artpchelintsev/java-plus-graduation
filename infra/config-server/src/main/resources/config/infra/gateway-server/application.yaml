@@ -2,26 +2,79 @@ server:
   port: 8080
 
 spring:
+  application:
+    name: gateway-server
   cloud:
     gateway:
-      discovery.locator.enabled: true
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
       routes:
-        - id: main_service_route
-          uri: lb://main-service
+        # User Service routes
+        - id: user-service
+          uri: lb://USER-SERVICE
           predicates:
-            - Path=/**
-        - id: user_service_route
-          uri: lb://user-service
+            - Path=/api/v1/users/**,/users/**
+          filters:
+            - StripPrefix=1
+
+        # Event Service routes
+        - id: event-service
+          uri: lb://EVENT-SERVICE
           predicates:
-            - Path=/**
+            - Path=/api/v1/events/**,/events/**
+          filters:
+            - StripPrefix=1
+
+
+        - id: request-service
+          uri: lb://REQUEST-SERVICE
+          predicates:
+            - Path=/api/v1/requests/**,/requests/**
+          filters:
+            - StripPrefix=1
+
+
+        - id: compilation-service
+          uri: lb://COMPILATION-SERVICE
+          predicates:
+            - Path=/api/v1/compilations/**,/compilations/**
+          filters:
+            - StripPrefix=1
+
+
+        - id: stats-server
+          uri: lb://STATS-SERVER
+          predicates:
+            - Path=/api/v1/stats/**,/stats/**
+          filters:
+            - StripPrefix=1
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    preferIpAddress: true
+    instance-id: ${spring.application.name}:${random.value}
 
 management:
   endpoint:
+    gateway:
+      enabled: true
     health:
+      enabled: true
+    info:
       enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: gateway,health,info,metrics
 
-
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: DEBUG
