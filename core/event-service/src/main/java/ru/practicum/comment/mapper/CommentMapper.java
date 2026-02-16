@@ -8,7 +8,7 @@ import ru.practicum.comment.model.Comment;
 @Mapper(componentModel = "spring")
 public interface CommentMapper {
 
-    @Mapping(target = "authorId", source = "author.id")
+    @Mapping(target = "authorId", source = "authorId")
     @Mapping(target = "eventId", source = "event.id")
     CommentDto toDto(Comment comment);
 }

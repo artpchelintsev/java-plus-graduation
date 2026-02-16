@@ -8,7 +8,6 @@ import ru.practicum.comment.dto.CommentAdminFilter;
 import ru.practicum.comment.dto.CommentDto;
 import ru.practicum.comment.dto.UpdateCommentDto;
 import ru.practicum.comment.service.CommentService;
-import ru.practicum.dto.PageParams;
 
 import java.util.List;
 
@@ -22,13 +21,7 @@ public class CommentAdminController {
     // Получить список комментариев (все, по пользователю или событию, с флагом includeDeleted)
     @GetMapping
     public List<CommentDto> getAllComments(@ModelAttribute CommentAdminFilter filter) {
-        PageParams params = new PageParams(filter.getFrom(), filter.getSize());
-        return commentService.getAllComments(
-                filter.getEventId(),
-                filter.getAuthorId(),
-                filter.getIncludeDeleted(),
-                params
-        );
+        return commentService.getAllComments(filter);
     }
 
     //Получить конкретный комментарий (включая удалённые)

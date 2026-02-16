@@ -22,7 +22,7 @@ public class CommentPublicController {
             @RequestParam(defaultValue = "10") int size
     ) {
         PageParams params = new PageParams(from, size);
-        return commentService.getCommentsByEvent(eventId, params);
+        return commentService.getCommentsByEvent(eventId, params.getFrom(), params.getSize());
     }
 
     @GetMapping("/{commentId}")

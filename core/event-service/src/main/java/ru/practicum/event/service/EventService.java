@@ -109,7 +109,7 @@ public class EventService {
 
             enrichWithInitiator(dto, dto.getInitiator().getId());
 
-            enrichWithConfirmedRequests(List.of(dto));
+            setConfirmedRequestsForEvents(List.of(dto));
 
             String uri = "/events/" + dto.getId();
             Map<String, Long> hits = fetchHitsForUris(List.of(uri));
@@ -192,7 +192,7 @@ public class EventService {
 
         if (dto != null) {
             enrichWithInitiator(dto, event.getInitiatorId());
-            enrichWithConfirmedRequests(List.of(dto));
+            setConfirmedRequestsForEvents(List.of(dto));
 
             String uri = "/events/" + dto.getId();
             Map<String, Long> hits = fetchHitsForUris(List.of(uri));
@@ -369,8 +369,8 @@ public class EventService {
 
             log.debug("Enriched {} events with confirmed requests", events.size());
 
-        } catch (Exception e) {
-            log.error("Failed to enrich with confirmed requests", e);
+        } catch (Exception ex) {
+            log.error("Failed to enrich with confirmed requests", ex);
             events.forEach(e -> e.setConfirmedRequests(0));
         }
     }

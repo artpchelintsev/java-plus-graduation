@@ -1,37 +1,26 @@
 package ru.practicum.mapper;
 
-import org.mapstruct.*;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import ru.practicum.dto.CompilationDto;
 import ru.practicum.dto.NewCompilationDto;
-import ru.practicum.model.Compilation;
-import ru.practicum.event.mapper.EventMapper;
+import ru.practicum.dto.UpdateCompilationRequest;
 import ru.practicum.event.model.Event;
+import ru.practicum.model.Compilation;
 
-import java.util.Collections;
 import java.util.List;
 
-@Mapper(componentModel = "spring", uses = {EventMapper.class})
+@Mapper(componentModel = "spring")
 public interface CompilationMapper {
 
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "events", source = "events", qualifiedByName = "emptyListIfNull")
-    Compilation toEntity(NewCompilationDto dto, List<Event> events);
-
+    @Mapping(target = "events", ignore = true)
     CompilationDto toDto(Compilation compilation);
 
-    List<CompilationDto> toDtoList(List<Compilation> compilations);
-
-    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "events", ignore = true)
-    void updateCompilationFromDto(NewCompilationDto dto, @MappingTarget Compilation entity);
-
-    @Named("emptyListIfNull")
-    default List<Event> emptyListIfNull(List<Event> events) {
-        return events != null ? events : Collections.emptyList();
-    }
+    @Mapping(target = "pinned", defaultValue = "false")
+    Compilation toEntity(NewCompilationDto dto, List<Event> events);
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "events", ignore = true)
-    Compilation toEntity(NewCompilationDto dto);
+    void updateFromDto(UpdateCompilationRequest dto, @MappingTarget Compilation compilation);
 }

@@ -25,7 +25,7 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
         BooleanBuilder where = new BooleanBuilder();
 
         if (filter.getUsers() != null && !filter.getUsers().isEmpty()) {
-            where.and(event.initiator.id.in(filter.getUsers()));
+            where.and(event.initiatorId.in(filter.getUsers()));  // Изменено: initiator.id → initiatorId
         }
 
         if (filter.getStates() != null && !filter.getStates().isEmpty()) {
@@ -33,7 +33,7 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
         }
 
         if (filter.getCategories() != null && !filter.getCategories().isEmpty()) {
-            where.and(event.category.id.in(filter.getCategories()));
+            where.and(event.categoryId.in(filter.getCategories()));  // Изменено: category.id → categoryId
         }
 
         if (filter.getRangeStart() != null) {
@@ -70,7 +70,7 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
         }
 
         if (filter.getCategories() != null && !filter.getCategories().isEmpty()) {
-            where.and(event.category.id.in(filter.getCategories()));
+            where.and(event.categoryId.in(filter.getCategories()));  // Изменено: category.id → categoryId
         }
 
         if (filter.getPaid() != null) {
@@ -85,10 +85,9 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
         }
 
         if (Boolean.TRUE.equals(filter.getOnlyAvailable())) {
-            where.and(event.participantLimit.eq(0)
-                    .or(event.requests.size().lt(event.participantLimit)));
-        }
 
+            where.and(event.participantLimit.eq(0));
+        }
 
         JPQLQuery<Event> query = queryFactory
                 .selectFrom(event)

@@ -103,10 +103,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserBatchDto getUsersByIds(List<Long> userIds) {
+        UserBatchDto result = new UserBatchDto();
+
         if (userIds == null || userIds.isEmpty()) {
-            return UserBatchDto.builder()
-                    .users(new HashMap<>())
-                    .build();
+            result.setUsers(new HashMap<>());
+            return result;
         }
 
         List<User> users = userRepository.findAllById(userIds);
@@ -114,14 +115,15 @@ public class UserServiceImpl implements UserService {
         Map<Long, UserShortDto> userMap = users.stream()
                 .collect(Collectors.toMap(
                         User::getId,
-                        user -> UserShortDto.builder()
-                                .id(user.getId())
-                                .name(user.getName())
-                                .build()
+                        user -> {
+                            UserShortDto dto = new UserShortDto();
+                            dto.setId(user.getId());
+                            dto.setName(user.getName());
+                            return dto;
+                        }
                 ));
 
-        return UserBatchDto.builder()
-                .users(userMap)
-                .build();
+        result.setUsers(userMap);
+        return result;
     }
 }

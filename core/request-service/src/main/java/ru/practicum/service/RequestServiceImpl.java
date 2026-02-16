@@ -1,44 +1,50 @@
 package ru.practicum.service;
 
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.client.EventFeignClient;
 import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
-import ru.practicum.event.dao.EventRepository;
-import ru.practicum.event.model.Event;
-import ru.practicum.event.model.EventState;
+import ru.practicum.dto.ConfirmedRequestCount;
+import ru.practicum.dto.EventRequestStatusUpdateRequest;
+import ru.practicum.dto.EventRequestStatusUpdateResult;
+import ru.practicum.dto.RequestDto;
+import ru.practicum.dto.event.EventFullDto;
+import ru.practicum.dto.request.RequestStatsDto;
 import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.ExistException;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.exception.ValidationException;
-import ru.practicum.dto.EventRequestStatusUpdateRequest;
-import ru.practicum.dto.EventRequestStatusUpdateResult;
-import ru.practicum.dto.RequestDto;
 import ru.practicum.mapper.RequestMapper;
 import ru.practicum.model.Request;
 import ru.practicum.model.RequestStatus;
 import ru.practicum.repository.RequestRepository;
-import ru.practicum.user.model.User;
-import ru.practicum.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class RequestServiceImpl implements RequestService {
 
     private final RequestRepository requestRepository;
-    private final UserFeignClient userRepository;
-    private final EventFeignClient eventRepository;
+    private final UserFeignClient userFeignClient;
+    private final EventFeignClient eventFeignClient;
     private final RequestMapper mapper;
     private final EntityValidator entityValidator;
 
     @Override
     public List<RequestDto> getUserRequests(Long userId) {
-        entityValidator.ensureExists(userRepository, userId, "Пользователь");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
+
         List<Request> requests = requestRepository.findAllByRequesterId(userId);
         return mapper.toDtoList(requests);
     }
@@ -46,14 +52,24 @@ public class RequestServiceImpl implements RequestService {
     @Override
     @Transactional
     public RequestDto createRequest(Long userId, Long eventId) {
-        User user = entityValidator.ensureAndGet(userRepository, userId, "Пользователь");
-        Event event = entityValidator.ensureAndGet(eventRepository, eventId, "Событие");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
+
+        EventFullDto event;
+        try {
+            event = eventFeignClient.getEventById(eventId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("Event not found: " + eventId);
+        }
 
         if (Objects.equals(event.getInitiator().getId(), userId)) {
             throw new ValidationException("Инициатор события не может создать заявку на участие в своём же событии");
         }
 
-        if (event.getState() == null || event.getState() != EventState.PUBLISHED) {
+        if (event.getState() == null || !"PUBLISHED".equals(event.getState())) {
             throw new ValidationException("Нельзя добавить заявку: событие не опубликовано");
         }
 
@@ -68,27 +84,33 @@ public class RequestServiceImpl implements RequestService {
         }
 
         RequestStatus initialStatus = RequestStatus.PENDING;
-        if (!event.isRequestModeration() || limit == null || limit == 0) {
+        if (!event.getRequestModeration() || limit == null || limit == 0) {
             initialStatus = RequestStatus.CONFIRMED;
         }
 
-        Request request = mapper.toNewEntity(event, user, initialStatus);
-
-        LocalDateTime creationTime = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
-        request.setCreated(creationTime);
+        Request request = Request.builder()
+                .eventId(eventId)
+                .requesterId(userId)
+                .status(initialStatus)
+                .created(LocalDateTime.now().truncatedTo(ChronoUnit.MICROS))
+                .build();
 
         Request saved = requestRepository.save(request);
-
         return mapper.toDto(saved);
     }
 
     @Override
     @Transactional
     public RequestDto cancelRequest(Long userId, Long requestId) {
-        entityValidator.ensureExists(userRepository, userId, "Пользователь");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
+
         Request request = entityValidator.ensureAndGet(requestRepository, requestId, "Заявка");
 
-        if (!Objects.equals(request.getRequester().getId(), userId)) {
+        if (!Objects.equals(request.getRequesterId(), userId)) {
             throw new ValidationException("Пользователь может отменять только свои заявки");
         }
 
@@ -99,8 +121,18 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     public List<RequestDto> getEventRequests(Long userId, Long eventId) {
-        entityValidator.ensureExists(userRepository, userId, "Пользователь");
-        Event event = entityValidator.ensureAndGet(eventRepository, eventId, "Событие");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
+
+        EventFullDto event;
+        try {
+            event = eventFeignClient.getEventById(eventId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("Event not found: " + eventId);
+        }
 
         if (!Objects.equals(event.getInitiator().getId(), userId)) {
             throw new NotFoundException("Только инициатор может просматривать заявки данного события");
@@ -114,8 +146,18 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     public EventRequestStatusUpdateResult changeRequestStatus(Long userId, Long eventId,
                                                               EventRequestStatusUpdateRequest updateRequest) {
-        entityValidator.ensureExists(userRepository, userId, "Пользователь");
-        Event event = entityValidator.ensureAndGet(eventRepository, eventId, "Событие");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
+
+        EventFullDto event;
+        try {
+            event = eventFeignClient.getEventById(eventId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("Event not found: " + eventId);
+        }
 
         if (!Objects.equals(event.getInitiator().getId(), userId)) {
             throw new ValidationException("Только инициатор может менять статусы заявок");
@@ -199,6 +241,28 @@ public class RequestServiceImpl implements RequestService {
         return EventRequestStatusUpdateResult.builder()
                 .confirmedRequests(mapper.toDtoList(confirmed))
                 .rejectedRequests(mapper.toDtoList(rejected))
+                .build();
+    }
+
+    @Override
+    public RequestStatsDto getRequestStatsByEvents(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return RequestStatsDto.builder()
+                    .confirmedRequests(new HashMap<>())
+                    .build();
+        }
+
+        List<ConfirmedRequestCount> counts = requestRepository
+                .countConfirmedRequestsForEvents(eventIds, RequestStatus.CONFIRMED);
+
+        Map<Long, Integer> statsMap = counts.stream()
+                .collect(Collectors.toMap(
+                        ConfirmedRequestCount::getEventId,
+                        c -> c.getCount().intValue()
+                ));
+
+        return RequestStatsDto.builder()
+                .confirmedRequests(statsMap)
                 .build();
     }
 }
