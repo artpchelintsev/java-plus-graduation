@@ -7,18 +7,19 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.client.EventFeignClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.CompilationDto;
 import ru.practicum.dto.NewCompilationDto;
 import ru.practicum.dto.UpdateCompilationRequest;
+import ru.practicum.dto.event.EventBatchDto;
+import ru.practicum.exception.ConflictException;
 import ru.practicum.mapper.CompilationMapper;
 import ru.practicum.model.Compilation;
+import ru.practicum.repository.CompilationEventRepository;
 import ru.practicum.repository.CompilationRepository;
-import ru.practicum.event.dao.EventRepository;
-import ru.practicum.event.model.Event;
-import ru.practicum.exception.ConflictException;
-import ru.practicum.exception.NotFoundException;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -27,27 +28,29 @@ import java.util.List;
 public class CompilationServiceImpl implements CompilationService {
 
     private final CompilationRepository compilationRepository;
-    private final EventRepository eventRepository;
+    private final CompilationEventRepository compilationEventRepository;
     private final CompilationMapper compilationMapper;
     private final EntityValidator entityValidator;
+    private final EventFeignClient eventFeignClient;
 
     @Override
     @Transactional
     public CompilationDto createCompilation(NewCompilationDto compilationDto) {
         log.info("Создание новой подборки с названием: {}", compilationDto.getTitle());
 
-        // Проверка уникальности названия
         if (compilationRepository.existsByTitle(compilationDto.getTitle())) {
             throw new ConflictException("Подборка с названием='" + compilationDto.getTitle() + "' уже существует");
         }
 
-        List<Event> events = getEventsByIds(compilationDto.getEvents());
-
-        Compilation compilation = compilationMapper.toEntity(compilationDto, events);
+        Compilation compilation = compilationMapper.toEntity(compilationDto);
         Compilation savedCompilation = compilationRepository.save(compilation);
 
+        if (compilationDto.getEvents() != null && !compilationDto.getEvents().isEmpty()) {
+            saveCompilationEvents(savedCompilation.getId(), compilationDto.getEvents());
+        }
+
         log.info("Подборка создана с id: {}", savedCompilation.getId());
-        return compilationMapper.toDto(savedCompilation);
+        return getCompilationDtoWithEvents(savedCompilation);
     }
 
     @Override
@@ -59,7 +62,6 @@ public class CompilationServiceImpl implements CompilationService {
                 compilationRepository, compId, "Подборка"
         );
 
-        // Проверка уникальности названия при обновлении
         if (request.getTitle() != null && !request.getTitle().equals(compilation.getTitle())) {
             if (compilationRepository.existsByTitle(request.getTitle())) {
                 throw new ConflictException("Подборка с названием='" + request.getTitle() + "' уже существует");
@@ -72,24 +74,23 @@ public class CompilationServiceImpl implements CompilationService {
         }
 
         if (request.getEvents() != null) {
-            List<Event> events = getEventsByIds(request.getEvents());
-            compilation.setEvents(events);
+            compilationEventRepository.deleteByCompilationId(compId);
+            if (!request.getEvents().isEmpty()) {
+                saveCompilationEvents(compId, request.getEvents());
+            }
         }
 
         Compilation updatedCompilation = compilationRepository.save(compilation);
         log.info("Подборка обновлена с id: {}", compId);
 
-        return compilationMapper.toDto(updatedCompilation);
+        return getCompilationDtoWithEvents(updatedCompilation);
     }
 
     @Override
     @Transactional
     public void deleteCompilation(Long compId) {
         log.info("Удаление подборки с id: {}", compId);
-
-        // Проверяем существование перед удалением
         entityValidator.ensureExists(compilationRepository, compId, "Подборка");
-
         compilationRepository.deleteById(compId);
         log.info("Подборка удалена с id: {}", compId);
     }
@@ -97,12 +98,14 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional(readOnly = true)
     public List<CompilationDto> getCompilations(Boolean pinned, Integer from, Integer size) {
-        log.info("Получение подборки с pinned={}, from={}, size={}", pinned, from, size);
+        log.info("Получение подборок с pinned={}, from={}, size={}", pinned, from, size);
 
         Pageable pageable = PageRequest.of(from / size, size);
         Page<Compilation> compilationsPage = compilationRepository.findByPinned(pinned, pageable);
 
-        return compilationMapper.toDtoList(compilationsPage.getContent());
+        return compilationsPage.getContent().stream()
+                .map(this::getCompilationDtoWithEvents)
+                .toList();
     }
 
     @Override
@@ -114,25 +117,34 @@ public class CompilationServiceImpl implements CompilationService {
                 compilationRepository, compId, "Подборка"
         );
 
-        return compilationMapper.toDto(compilation);
+        return getCompilationDtoWithEvents(compilation);
     }
 
-    private List<Event> getEventsByIds(List<Long> eventIds) {
-        if (eventIds == null || eventIds.isEmpty()) {
-            return List.of();
+    private void saveCompilationEvents(Long compilationId, List<Long> eventIds) {
+        var compilationEvents = eventIds.stream()
+                .map(eventId -> new ru.practicum.model.CompilationEvent(compilationId, eventId))
+                .toList();
+        compilationEventRepository.saveAll(compilationEvents);
+    }
+
+    private CompilationDto getCompilationDtoWithEvents(Compilation compilation) {
+        List<Long> eventIds = compilationEventRepository.findEventIdsByCompilationId(compilation.getId());
+
+        CompilationDto dto = compilationMapper.toDto(compilation);
+
+        // Получаем события через FeignClient
+        if (!eventIds.isEmpty()) {
+            try {
+                EventBatchDto batchDto = eventFeignClient.getEventsByIds(eventIds);
+                dto.setEvents(batchDto.getEvents().values().stream().toList());
+            } catch (Exception e) {
+                log.error("Ошибка при получении событий из event-service", e);
+                dto.setEvents(Collections.emptyList());
+            }
+        } else {
+            dto.setEvents(Collections.emptyList());
         }
 
-        List<Event> events = eventRepository.findAllById(eventIds);
-
-        // Проверяем, что все события найдены
-        if (events.size() != eventIds.size()) {
-            List<Long> foundIds = events.stream().map(Event::getId).toList();
-            List<Long> missingIds = eventIds.stream()
-                    .filter(id -> !foundIds.contains(id))
-                    .toList();
-            throw new NotFoundException("События с id=" + missingIds + " не найдены");
-        }
-
-        return events;
+        return dto;
     }
 }

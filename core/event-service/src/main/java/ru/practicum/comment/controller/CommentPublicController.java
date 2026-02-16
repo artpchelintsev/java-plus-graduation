@@ -1,12 +1,12 @@
 package ru.practicum.comment.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import ru.practicum.comment.dto.CommentDto;
 import ru.practicum.comment.service.CommentService;
-import ru.practicum.dto.PageParams;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/events/{eventId}/comments")
@@ -15,15 +15,6 @@ public class CommentPublicController {
 
     private final CommentService commentService;
 
-    @GetMapping
-    public List<CommentDto> getComments(
-            @PathVariable Long eventId,
-            @RequestParam(defaultValue = "0") int from,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        PageParams params = new PageParams(from, size);
-        return commentService.getCommentsByEvent(eventId, params.getFrom(), params.getSize());
-    }
 
     @GetMapping("/{commentId}")
     public CommentDto getComment(@PathVariable Long commentId) {
