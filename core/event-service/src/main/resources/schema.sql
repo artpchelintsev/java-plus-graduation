@@ -26,8 +26,7 @@ CREATE TABLE IF NOT EXISTS events (
     participant_limit INTEGER DEFAULT 0,
     request_moderation BOOLEAN DEFAULT TRUE,
     state event_state NOT NULL,
-    CONSTRAINT fk_event_to_category FOREIGN KEY(category_id) REFERENCES categories(id),
-    CONSTRAINT fk_event_to_user FOREIGN KEY(initiator_id) REFERENCES users(id)
+    CONSTRAINT fk_event_to_category FOREIGN KEY(category_id) REFERENCES categories(id)
 );
 
 -- Таблица comments
@@ -39,6 +38,5 @@ CREATE TABLE IF NOT EXISTS comments (
     created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_on TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE,
-    CONSTRAINT fk_comment_to_event FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
-    CONSTRAINT fk_comment_to_user FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_comment_to_event FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
 );
