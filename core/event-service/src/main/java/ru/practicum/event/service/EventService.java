@@ -1,17 +1,28 @@
 package ru.practicum.event.service;
 
+import feign.FeignException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import ru.practicum.client.RequestFeignClient;
 import ru.practicum.client.StatsClient;
+import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
+import ru.practicum.dto.event.EventFullDto;
+import ru.practicum.dto.request.RequestStatsDto;
+import ru.practicum.dto.user.UserBatchDto;
+import ru.practicum.dto.user.UserDto;
+import ru.practicum.dto.user.UserShortDto;
 import ru.practicum.event.dao.EventRepository;
-import ru.practicum.event.dto.*;
+import ru.practicum.event.dto.EventShortDto;
+import ru.practicum.event.dto.NewEventDto;
+import ru.practicum.event.dto.UpdateEventAdminRequest;
+import ru.practicum.event.dto.UpdateEventUserRequest;
 import ru.practicum.event.dto.enums.AdminStateAction;
 import ru.practicum.event.dto.enums.EventSort;
 import ru.practicum.event.dto.enums.UserStateAction;
@@ -25,36 +36,36 @@ import ru.practicum.exception.ExistException;
 import ru.practicum.exception.InvalidDateRangeException;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.exception.ValidationException;
-import ru.practicum.request.dto.ConfirmedRequestCount;
-import ru.practicum.request.model.RequestStatus;
-import ru.practicum.request.repository.RequestRepository;
-import ru.practicum.user.model.User;
-import ru.practicum.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
 @Slf4j
 public class EventService {
-    private final UserRepository userRepository;
     private final EventRepository eventRepository;
     private final EventMapper eventMapper;
-    private final RequestRepository requestRepository;
-
     private final StatsClient statsClient;
     private final HttpServletRequest request;
     private final EntityValidator entityValidator;
+    private final UserFeignClient userFeignClient;
+    private final RequestFeignClient requestFeignClient;
 
     public List<EventShortDto> findEvents(UserEventsQuery query) {
         List<EventShortDto> dtos = eventMapper.toEventsShortDto(eventRepository.findByInitiatorId(query.userId(),
                 PageRequest.of(query.from() / query.size(), query.size())));
 
         if (dtos != null && !dtos.isEmpty()) {
+
+            enrichWithInitiators(dtos);
+
+            enrichWithConfirmedRequests(dtos);
+
             List<String> uris = dtos.stream()
                     .map(d -> "/events/" + d.getId())
                     .collect(Collectors.toList());
@@ -70,7 +81,11 @@ public class EventService {
 
     @Transactional
     public EventFullDto createEvent(long userId, NewEventDto eventDto) {
-        User owner = entityValidator.ensureAndGet(userRepository, userId, "User");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
 
         if (eventDto.getEventDate() != null) {
             LocalDateTime now = LocalDateTime.now();
@@ -79,11 +94,8 @@ public class EventService {
             }
         }
 
-
         Event event = eventMapper.fromNewEventDto(eventDto);
-        event.setInitiator(owner);
-
-
+        event.setInitiatorId(userId);
         event.setState(EventState.PENDING);
 
         Event savedItem = eventRepository.save(event);
@@ -91,10 +103,14 @@ public class EventService {
         return eventMapper.toEventFullDto(savedItem);
     }
 
-
     public EventFullDto findUserEventById(long userId, long eventId) {
         EventFullDto dto = eventMapper.toEventFullDto(findByIdAndUser(eventId, userId));
         if (dto != null) {
+
+            enrichWithInitiator(dto, dto.getInitiator().getId());
+
+            enrichWithConfirmedRequests(List.of(dto));
+
             String uri = "/events/" + dto.getId();
             Map<String, Long> hits = fetchHitsForUris(List.of(uri));
             dto.setViews(hits.getOrDefault(uri, 0L));
@@ -151,6 +167,9 @@ public class EventService {
         List<EventShortDto> dtos = eventMapper.toEventsShortDto(eventRepository.searchEventsByPublic(filter));
 
         if (dtos != null && !dtos.isEmpty()) {
+            enrichWithInitiators(dtos);
+            enrichWithConfirmedRequests(dtos);
+
             List<String> uris = dtos.stream().map(d -> "/events/" + d.getId()).collect(Collectors.toList());
             Map<String, Long> hits = fetchHitsForUris(uris);
             for (EventShortDto dto : dtos) {
@@ -172,11 +191,12 @@ public class EventService {
         EventFullDto dto = eventMapper.toEventFullDto(event);
 
         if (dto != null) {
-            String uri = "/events/" + dto.getId();
+            enrichWithInitiator(dto, event.getInitiatorId());
+            enrichWithConfirmedRequests(List.of(dto));
 
+            String uri = "/events/" + dto.getId();
             Map<String, Long> hits = fetchHitsForUris(List.of(uri));
             dto.setViews(hits.getOrDefault(uri, 0L));
-
             saveHit();
         }
 
@@ -186,6 +206,7 @@ public class EventService {
     public List<EventFullDto> searchEventsByAdmin(AdminEventFilter filter) {
         List<EventFullDto> dtos = eventMapper.toEventsFullDto(eventRepository.searchEventsByAdmin(filter));
 
+        enrichWithInitiatorsForFullDto(dtos);
         setConfirmedRequestsForEvents(dtos);
 
         if (dtos != null && !dtos.isEmpty()) {
@@ -198,21 +219,28 @@ public class EventService {
             }
         }
 
-
         return dtos;
     }
 
     private void setConfirmedRequestsForEvents(List<EventFullDto> dtos) {
-        List<Long> eventIds = dtos.stream()
-                .map(EventFullDto::getId)
-                .toList();
+        if (dtos == null || dtos.isEmpty()) return;
 
-        List<ConfirmedRequestCount> requestCounts = requestRepository.countConfirmedRequestsForEvents(eventIds, RequestStatus.CONFIRMED);
+        try {
+            List<Long> eventIds = dtos.stream()
+                    .map(EventFullDto::getId)
+                    .collect(Collectors.toList());
 
-        Map<Long, Long> confirmedRequestsMap = requestCounts.stream()
-                .collect(Collectors.toMap(ConfirmedRequestCount::getEventId, ConfirmedRequestCount::getCount));
+            RequestStatsDto stats = requestFeignClient.getRequestStats(eventIds);
+            Map<Long, Integer> confirmedRequestsMap = stats.getConfirmedRequests();
 
-        dtos.forEach(dto -> dto.setConfirmedRequests(confirmedRequestsMap.getOrDefault(dto.getId(), 0L)));
+            dtos.forEach(dto -> dto.setConfirmedRequests(
+                    confirmedRequestsMap.getOrDefault(dto.getId(), 0).longValue()));
+
+            log.debug("Enriched {} events with confirmed requests", dtos.size());
+        } catch (Exception e) {
+            log.error("Failed to enrich with confirmed requests", e);
+            dtos.forEach(dto -> dto.setConfirmedRequests(0L));
+        }
     }
 
     @Transactional
@@ -240,6 +268,111 @@ public class EventService {
         }
 
         return eventMapper.toEventFullDto(eventRepository.save(event));
+    }
+
+    public void ensureUserIsInitiator(Long userId, Long eventId) {
+        Event event = entityValidator.ensureAndGet(eventRepository, eventId, "Событие");
+        if (!event.getInitiatorId().equals(userId)) {
+            throw new ValidationException("Только инициатор может просматривать заявки");
+        }
+    }
+
+    private void enrichWithInitiators(List<EventShortDto> events) {
+        if (events == null || events.isEmpty()) return;
+
+        try {
+            List<Long> initiatorIds = events.stream()
+                    .map(e -> e.getInitiator() != null ? e.getInitiator().getId() : null)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (initiatorIds.isEmpty()) return;
+
+            UserBatchDto usersData = userFeignClient.getUsersByIds(initiatorIds);
+            Map<Long, UserShortDto> users = usersData.getUsers();
+
+            for (EventShortDto event : events) {
+                if (event.getInitiator() != null) {
+                    UserShortDto user = users.get(event.getInitiator().getId());
+                    if (user != null) {
+                        event.setInitiator(user);
+                    }
+                }
+            }
+
+            log.debug("Enriched {} events with initiators", events.size());
+
+        } catch (Exception e) {
+            log.error("Failed to enrich with initiators", e);
+        }
+    }
+
+    private void enrichWithInitiatorsForFullDto(List<EventFullDto> events) {
+        if (events == null || events.isEmpty()) return;
+
+        try {
+            List<Long> initiatorIds = events.stream()
+                    .map(e -> e.getInitiator() != null ? e.getInitiator().getId() : null)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (initiatorIds.isEmpty()) return;
+
+            UserBatchDto usersData = userFeignClient.getUsersByIds(initiatorIds);
+            Map<Long, UserShortDto> users = usersData.getUsers();
+
+            for (EventFullDto event : events) {
+                if (event.getInitiator() != null) {
+                    UserShortDto user = users.get(event.getInitiator().getId());
+                    if (user != null) {
+                        event.setInitiator(user);
+                    }
+                }
+            }
+
+            log.debug("Enriched {} events with initiators", events.size());
+
+        } catch (Exception e) {
+            log.error("Failed to enrich with initiators", e);
+        }
+    }
+
+    private void enrichWithInitiator(EventFullDto event, Long initiatorId) {
+        try {
+            UserDto user = userFeignClient.getUserById(initiatorId);
+            event.setInitiator(UserShortDto.builder()
+                    .id(user.getId())
+                    .name(user.getName())
+                    .build());
+        } catch (Exception e) {
+            log.error("Failed to enrich with initiator", e);
+        }
+    }
+
+    private void enrichWithConfirmedRequests(List<EventShortDto> events) {
+        if (events == null || events.isEmpty()) return;
+
+        try {
+            List<Long> eventIds = events.stream()
+                    .map(EventShortDto::getId)
+                    .collect(Collectors.toList());
+
+            RequestStatsDto stats = requestFeignClient.getRequestStats(eventIds);
+            Map<Long, Integer> confirmedRequests = stats.getConfirmedRequests();
+
+            for (EventShortDto event : events) {
+                Integer count = confirmedRequests.getOrDefault(event.getId(), 0);
+                event.setConfirmedRequests(count);
+            }
+
+            log.debug("Enriched {} events with confirmed requests", events.size());
+
+        } catch (Exception e) {
+            log.error("Failed to enrich with confirmed requests", e);
+            events.forEach(e -> e.setConfirmedRequests(0));
+        }
     }
 
     private void saveHit() {

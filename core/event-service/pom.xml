@@ -13,7 +13,7 @@
     <artifactId>event-service</artifactId>
     <packaging>jar</packaging>
 
-    <name>main-service</name>
+    <name>event-service</name>
 
     <dependencies>
         <dependency>
@@ -116,6 +116,12 @@
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-feign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.practicum</groupId>
+            <artifactId>user-service</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 

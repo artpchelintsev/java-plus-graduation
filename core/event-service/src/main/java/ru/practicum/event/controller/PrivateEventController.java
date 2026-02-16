@@ -8,16 +8,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.event.dto.EventFullDto;
+import ru.practicum.client.RequestFeignClient;
+import ru.practicum.dto.event.EventFullDto;
+import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.event.dto.EventShortDto;
 import ru.practicum.event.dto.NewEventDto;
 import ru.practicum.event.dto.UpdateEventUserRequest;
 import ru.practicum.event.dto.request.UserEventsQuery;
 import ru.practicum.event.service.EventService;
-import ru.practicum.request.dto.EventRequestStatusUpdateRequest;
-import ru.practicum.request.dto.EventRequestStatusUpdateResult;
-import ru.practicum.request.dto.RequestDto;
-import ru.practicum.request.service.RequestServiceImpl;
 
 import java.util.List;
 
@@ -28,7 +26,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PrivateEventController {
     private final EventService eventService;
-    private final RequestServiceImpl requestService;
+    private final RequestFeignClient requestFeignClient;
 
     @GetMapping
     public List<EventShortDto> findUserEvents(@PathVariable long userId,
@@ -60,15 +58,23 @@ public class PrivateEventController {
     }
 
     @GetMapping("/{eventId}/requests")
-    public List<RequestDto> getEventRequests(@PathVariable Long userId,
-                                             @PathVariable Long eventId) {
-        return requestService.getEventRequests(userId, eventId);
+    public List<ParticipationRequestDto> getEventRequests(@PathVariable Long userId,
+                                                          @PathVariable Long eventId) {
+        // Проверяем что пользователь - инициатор события
+        eventService.ensureUserIsInitiator(userId, eventId);
+
+        // Делегируем в request-service через Feign
+        return requestFeignClient.getEventRequests(userId, eventId);
     }
 
     @PatchMapping("/{eventId}/requests")
-    public EventRequestStatusUpdateResult updateStatuses(@PathVariable Long userId,
-                                                         @PathVariable Long eventId,
-                                                         @RequestBody EventRequestStatusUpdateRequest request) {
-        return requestService.changeRequestStatus(userId, eventId, request);
+    public Object updateStatuses(@PathVariable Long userId,
+                                 @PathVariable Long eventId,
+                                 @RequestBody Object request) {
+        // Проверяем что пользователь - инициатор события
+        eventService.ensureUserIsInitiator(userId, eventId);
+
+        // Делегируем в request-service через Feign
+        return requestFeignClient.changeRequestStatus(userId, eventId, request);
     }
 }

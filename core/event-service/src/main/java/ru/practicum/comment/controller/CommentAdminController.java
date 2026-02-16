@@ -8,7 +8,7 @@ import ru.practicum.comment.dto.CommentAdminFilter;
 import ru.practicum.comment.dto.CommentDto;
 import ru.practicum.comment.dto.UpdateCommentDto;
 import ru.practicum.comment.service.CommentService;
-import ru.practicum.user.dto.PageParams;
+import ru.practicum.dto.PageParams;
 
 import java.util.List;
 

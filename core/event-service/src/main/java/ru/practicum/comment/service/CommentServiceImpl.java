@@ -1,9 +1,12 @@
 package ru.practicum.comment.service;
 
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.client.UserFeignClient;
+import ru.practicum.comment.dto.CommentAdminFilter;
 import ru.practicum.comment.dto.CommentDto;
 import ru.practicum.comment.dto.NewCommentDto;
 import ru.practicum.comment.dto.UpdateCommentDto;
@@ -11,12 +14,10 @@ import ru.practicum.comment.mapper.CommentMapper;
 import ru.practicum.comment.model.Comment;
 import ru.practicum.comment.repository.CommentRepository;
 import ru.practicum.common.EntityValidator;
-import ru.practicum.event.model.Event;
 import ru.practicum.event.dao.EventRepository;
+import ru.practicum.event.model.Event;
+import ru.practicum.exception.NotFoundException;
 import ru.practicum.exception.ValidationException;
-import ru.practicum.user.model.User;
-import ru.practicum.user.repository.UserRepository;
-import ru.practicum.user.dto.PageParams;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
-    private final UserRepository userRepository;
+    private final UserFeignClient userFeignClient;
     private final EventRepository eventRepository;
     private final CommentMapper commentMapper;
     private final EntityValidator entityValidator;
@@ -35,11 +36,16 @@ public class CommentServiceImpl implements CommentService {
     @Override
     @Transactional
     public CommentDto addComment(Long userId, Long eventId, NewCommentDto dto) {
-        User author = entityValidator.ensureAndGet(userRepository, userId, "Пользователь");
+        try {
+            userFeignClient.getUserById(userId);
+        } catch (FeignException.NotFound e) {
+            throw new NotFoundException("User not found: " + userId);
+        }
+
         Event event = entityValidator.ensureAndGet(eventRepository, eventId, "Событие");
 
         Comment comment = Comment.builder()
-                .author(author)
+                .authorId(userId)  // Используем ID вместо объекта
                 .event(event)
                 .text(dto.getText().trim())
                 .createdOn(LocalDateTime.now())
@@ -53,7 +59,7 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     public CommentDto updateComment(Long userId, Long commentId, UpdateCommentDto dto) {
         Comment comment = entityValidator.ensureAndGet(commentRepository, commentId, "Комментарий");
-        if (!comment.getAuthor().getId().equals(userId)) {
+        if (!comment.getAuthorId().equals(userId)) {  // Используем authorId
             throw new ValidationException("Нельзя изменять чужой комментарий");
         }
         comment.setText(dto.getText().trim());
@@ -65,7 +71,7 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     public void deleteComment(Long userId, Long commentId) {
         Comment comment = entityValidator.ensureAndGet(commentRepository, commentId, "Комментарий");
-        if (!comment.getAuthor().getId().equals(userId)) {
+        if (!comment.getAuthorId().equals(userId)) {  // Используем authorId
             throw new ValidationException("Нельзя удалять чужой комментарий");
         }
         comment.setDeleted(true);
@@ -82,17 +88,22 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    public List<CommentDto> getCommentsByEvent(Long eventId, PageParams pageParams) {
-        PageRequest pageable = PageRequest.of(pageParams.getPageNumber(), pageParams.getSize());
+    public List<CommentDto> getCommentsByEvent(Long eventId, int from, int size) {
+        PageRequest pageable = PageRequest.of(from / size, size);
         return commentRepository.findAllByEventId(eventId, pageable)
                 .stream()
                 .map(commentMapper::toDto)
                 .collect(Collectors.toList());
     }
 
-    public List<CommentDto> getAllComments(Long eventId, Long authorId, Boolean includeDeleted, PageParams pageParams) {
-        PageRequest pageable = PageRequest.of(pageParams.getPageNumber(), pageParams.getSize());
-        return commentRepository.findAllFiltered(eventId, authorId, includeDeleted, pageable)
+    @Override
+    public List<CommentDto> getAllComments(CommentAdminFilter filter) {
+        PageRequest pageable = PageRequest.of(filter.getFrom() / filter.getSize(), filter.getSize());
+        return commentRepository.findAllFiltered(
+                        filter.getEventId(),
+                        filter.getAuthorId(),
+                        filter.getIncludeDeleted(),
+                        pageable)
                 .stream()
                 .map(commentMapper::toDto)
                 .collect(Collectors.toList());

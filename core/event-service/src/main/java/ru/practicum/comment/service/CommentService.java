@@ -1,9 +1,9 @@
 package ru.practicum.comment.service;
 
+import ru.practicum.comment.dto.CommentAdminFilter;
 import ru.practicum.comment.dto.CommentDto;
 import ru.practicum.comment.dto.NewCommentDto;
 import ru.practicum.comment.dto.UpdateCommentDto;
-import ru.practicum.user.dto.PageParams;
 
 import java.util.List;
 
@@ -17,10 +17,9 @@ public interface CommentService {
 
     CommentDto getCommentById(Long commentId);
 
-    List<CommentDto> getCommentsByEvent(Long eventId, PageParams pageParams);
+    List<CommentDto> getCommentsByEvent(Long eventId, int from, int size);
 
-    // Admin методы
-    List<CommentDto> getAllComments(Long eventId, Long authorId, Boolean includeDeleted, PageParams pageParams);
+    List<CommentDto> getAllComments(CommentAdminFilter filter);
 
     CommentDto adminUpdateComment(Long commentId, String text);
 

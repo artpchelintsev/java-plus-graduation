@@ -1,9 +1,6 @@
 package ru.practicum.mapper;
 
-import org.mapstruct.BeanMapping;
-import org.mapstruct.Mapper;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.*;
 import ru.practicum.dto.NewUserRequest;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.dto.user.UserShortDto;
@@ -14,6 +11,7 @@ public interface UserMapper {
 
     UserDto toDto(User user);
 
+    @Mapping(target = "id", ignore = true)
     User toEntity(NewUserRequest request);
 
     UserShortDto toUserShortDto(User user);
