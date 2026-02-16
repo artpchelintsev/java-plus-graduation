@@ -1,7 +1,6 @@
 package ru.practicum.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -10,43 +9,39 @@ import ru.practicum.model.Request;
 import ru.practicum.model.RequestStatus;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpecificationExecutor<Request> {
+public interface RequestRepository extends JpaRepository<Request, Long> {
 
-    default List<Request> findAllByEventIdWithRelations(Long eventId) {
-        return findAll(RequestSpecs.fetchRequesterAndEvent()
-                .and(RequestSpecs.byEvent(eventId)));
-    }
+    List<Request> findByEventId(Long eventId);
 
-    default List<Request> findAllByRequesterId(Long requesterId) {
-        return findAll(RequestSpecs.fetchRequesterAndEvent()
-                .and(RequestSpecs.byRequester(requesterId)));
-    }
+    List<Request> findByRequesterId(Long requesterId);
 
-    default long countConfirmedRequests(Long eventId) {
-        return count(RequestSpecs.byEvent(eventId)
-                .and(RequestSpecs.byStatus(RequestStatus.CONFIRMED)));
-    }
+    Optional<Request> findByEventIdAndRequesterId(Long eventId, Long requesterId);
 
-    @Query("""
-            SELECT r FROM Request r
-            JOIN FETCH r.requester
-            JOIN FETCH r.event
-            WHERE r.event.id = :eventId AND r.id IN :requestIds
-            """)
-    List<Request> findByEventIdAndIdInWithRelations(@Param("eventId") Long eventId, @Param("requestIds") List<Long> requestIds);
+    boolean existsByEventIdAndRequesterId(Long eventId, Long requesterId);
+
+    List<Request> findByEventIdAndIdIn(Long eventId, List<Long> requestIds);
+
+    List<Request> findByEventIdAndStatus(Long eventId, RequestStatus status);
+
+    long countByEventIdAndStatus(Long eventId, RequestStatus status);
+
+    @Query("SELECT COUNT(r) FROM Request r WHERE r.eventId = :eventId AND r.status = 'CONFIRMED'")
+    long countConfirmedRequestsByEventId(@Param("eventId") Long eventId);
 
     @Query("""
-            SELECT new ru.practicum.request.dto.ConfirmedRequestCount(e.id, COUNT(r))
+            SELECT new ru.practicum.dto.ConfirmedRequestCount(r.eventId, COUNT(r))
             FROM Request r
-            JOIN r.event e
             WHERE r.status = :status
-                AND e.id IN :eventIds
-            GROUP BY e.id
+                AND r.eventId IN :eventIds
+            GROUP BY r.eventId
             """)
     List<ConfirmedRequestCount> countConfirmedRequestsForEvents(@Param("eventIds") List<Long> eventIds,
                                                                 @Param("status") RequestStatus status);
 
-    boolean existsByEventIdAndRequesterId(Long eventId, Long requesterId);
+    void deleteByEventId(Long eventId);
+
+    void deleteByRequesterId(Long requesterId);
 }
