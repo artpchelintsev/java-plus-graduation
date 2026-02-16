@@ -4,11 +4,11 @@ spring:
   main:
     banner-mode: OFF
   config:
-    import: "optional:configserver:"
+    import: "optional:configserver:http://localhost:8888"
   cloud:
     config:
       discovery:
-        enabled: true
+        enabled: false
         serviceId: config-server
       fail-fast: true
       retry:
