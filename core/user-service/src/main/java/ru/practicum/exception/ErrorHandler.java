@@ -123,7 +123,21 @@ public class ErrorHandler {
     }
 
     @ExceptionHandler
-    @ResponseStatus(HttpStatus.CONFLICT)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleConstraintViolation(final jakarta.validation.ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .map(cv -> cv.getPropertyPath() + ": " + cv.getMessage())
+                .collect(java.util.stream.Collectors.joining(", "));
+        return new ApiError(
+                "Incorrectly made request.",
+                message,
+                "BAD_REQUEST",
+                LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleDataIntegrity(final org.springframework.dao.DataIntegrityViolationException e) {
         String message = "Integrity constraint has been violated.";
         if (e.getMostSpecificCause() != null && e.getMostSpecificCause().getMessage() != null) {
@@ -134,20 +148,6 @@ public class ErrorHandler {
                 message = "Duplicate value not allowed";
             }
         }
-        return new ApiError(
-                "Integrity constraint has been violated.",
-                message,
-                "CONFLICT",
-                LocalDateTime.now()
-        );
-    }
-
-    @ExceptionHandler
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError handleConstraintViolation(final jakarta.validation.ConstraintViolationException e) {
-        String message = e.getConstraintViolations().stream()
-                .map(cv -> cv.getPropertyPath() + ": " + cv.getMessage())
-                .collect(java.util.stream.Collectors.joining(", "));
         return new ApiError(
                 "Incorrectly made request.",
                 message,

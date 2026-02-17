@@ -137,7 +137,7 @@ public class ErrorHandler {
     }
 
     @ExceptionHandler
-    @ResponseStatus(HttpStatus.CONFLICT)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleDataIntegrity(final org.springframework.dao.DataIntegrityViolationException e) {
         String message = "Integrity constraint has been violated.";
         if (e.getMostSpecificCause() != null && e.getMostSpecificCause().getMessage() != null) {
@@ -149,9 +149,9 @@ public class ErrorHandler {
             }
         }
         return new ApiError(
-                "Integrity constraint has been violated.",
+                "Incorrectly made request.",
                 message,
-                "CONFLICT",
+                "BAD_REQUEST",
                 LocalDateTime.now()
         );
     }
