@@ -121,4 +121,18 @@ public class ErrorHandler {
                 LocalDateTime.now()
         );
     }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleConstraintViolation(final jakarta.validation.ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .map(cv -> cv.getPropertyPath() + ": " + cv.getMessage())
+                .collect(java.util.stream.Collectors.joining(", "));
+        return new ApiError(
+                "Incorrectly made request.",
+                message,
+                "BAD_REQUEST",
+                LocalDateTime.now()
+        );
+    }
 }

@@ -29,12 +29,12 @@ public class ErrorHandler {
     }
 
     @ExceptionHandler
-    @ResponseStatus(HttpStatus.CONFLICT)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleValidation(final ValidationException e) {
         return new ApiError(
-                "Integrity constraint has been violated.",
+                "Incorrectly made request.",
                 e.getMessage(),
-                "CONFLICT",
+                "BAD_REQUEST",
                 LocalDateTime.now()
         );
     }
@@ -117,6 +117,20 @@ public class ErrorHandler {
         return new ApiError(
                 "Incorrectly made request.",
                 "Отсутствует обязательный параметр запроса: " + e.getParameterName(),
+                "BAD_REQUEST",
+                LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleConstraintViolation(final jakarta.validation.ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .map(cv -> cv.getPropertyPath() + ": " + cv.getMessage())
+                .collect(java.util.stream.Collectors.joining(", "));
+        return new ApiError(
+                "Incorrectly made request.",
+                message,
                 "BAD_REQUEST",
                 LocalDateTime.now()
         );

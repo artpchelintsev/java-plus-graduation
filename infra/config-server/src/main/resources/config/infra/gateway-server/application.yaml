@@ -25,6 +25,13 @@ spring:
           filters:
             - StripPrefix=0
 
+        - id: category-service-public
+          uri: lb://EVENT-SERVICE
+          predicates:
+            - Path=/categories/**,/categories
+          filters:
+            - StripPrefix=0
+
         - id: compilation-service-admin
           uri: lb://COMPILATION-SERVICE
           predicates:
