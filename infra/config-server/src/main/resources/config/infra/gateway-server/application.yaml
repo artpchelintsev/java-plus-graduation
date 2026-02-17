@@ -11,45 +11,103 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
-        # User Service routes
-        - id: user-service
+        - id: user-service-admin
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/v1/users/**,/users/**
+            - Path=/admin/users/**
           filters:
-            - StripPrefix=1
+            - StripPrefix=0
 
-        # Event Service routes
+        - id: event-service-admin
+          uri: lb://EVENT-SERVICE
+          predicates:
+            - Path=/admin/events/**,/admin/categories/**,/admin/comments/**
+          filters:
+            - StripPrefix=0
+
+        - id: compilation-service-admin
+          uri: lb://COMPILATION-SERVICE
+          predicates:
+            - Path=/admin/compilations/**
+          filters:
+            - StripPrefix=0
+
+        - id: event-service-private
+          uri: lb://EVENT-SERVICE
+          predicates:
+            - Path=/users/*/events/**,/users/*/events
+          filters:
+            - StripPrefix=0
+
+        - id: request-service-private
+          uri: lb://REQUEST-SERVICE
+          predicates:
+            - Path=/users/*/requests/**,/users/*/requests
+          filters:
+            - StripPrefix=0
+
         - id: event-service
           uri: lb://EVENT-SERVICE
           predicates:
-            - Path=/api/v1/events/**,/events/**
+            - Path=/events/**,/events,/comments/**
           filters:
-            - StripPrefix=1
-
-
-        - id: request-service
-          uri: lb://REQUEST-SERVICE
-          predicates:
-            - Path=/api/v1/requests/**,/requests/**
-          filters:
-            - StripPrefix=1
-
+            - StripPrefix=0
 
         - id: compilation-service
           uri: lb://COMPILATION-SERVICE
           predicates:
-            - Path=/api/v1/compilations/**,/compilations/**
+            - Path=/compilations/**,/compilations
           filters:
-            - StripPrefix=1
+            - StripPrefix=0
 
+        - id: request-service
+          uri: lb://REQUEST-SERVICE
+          predicates:
+            - Path=/requests/**
+          filters:
+            - StripPrefix=0
 
         - id: stats-server
           uri: lb://STATS-SERVER
           predicates:
-            - Path=/api/v1/stats/**,/stats/**
+            - Path=/stats/**
           filters:
-            - StripPrefix=1
+            - StripPrefix=0
+
+        - id: user-service-api
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/v1/users/**
+          filters:
+            - StripPrefix=2
+
+        - id: event-service-api
+          uri: lb://EVENT-SERVICE
+          predicates:
+            - Path=/api/v1/events/**
+          filters:
+            - StripPrefix=2
+
+        - id: request-service-api
+          uri: lb://REQUEST-SERVICE
+          predicates:
+            - Path=/api/v1/requests/**
+          filters:
+            - StripPrefix=2
+
+        - id: compilation-service-api
+          uri: lb://COMPILATION-SERVICE
+          predicates:
+            - Path=/api/v1/compilations/**
+          filters:
+            - StripPrefix=2
+
+        - id: stats-server-api
+          uri: lb://STATS-SERVER
+          predicates:
+            - Path=/api/v1/stats/**
+          filters:
+            - StripPrefix=2
 
 eureka:
   client:
