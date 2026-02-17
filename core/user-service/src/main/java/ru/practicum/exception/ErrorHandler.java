@@ -155,4 +155,15 @@ public class ErrorHandler {
                 LocalDateTime.now()
         );
     }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleInvalidRequest(final InvalidRequestException e) {
+        return new ApiError(
+                "Incorrectly made request.",
+                e.getMessage(),
+                "BAD_REQUEST",
+                LocalDateTime.now()
+        );
+    }
 }

@@ -9,6 +9,7 @@ import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.user.UserBatchDto;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.dto.user.UserShortDto;
+import ru.practicum.exception.InvalidRequestException;
 import ru.practicum.exception.ValidationException;
 import ru.practicum.dto.NewUserRequest;
 import ru.practicum.dto.PageParams;
@@ -86,10 +87,13 @@ public class UserServiceImpl implements UserService {
 
     private void validateNewUserRequest(NewUserRequest req) {
         if (req == null) {
-            throw new ValidationException("Запрос на добавление пользователя не должен быть пустым");
+            throw new InvalidRequestException("Запрос на добавление пользователя не должен быть пустым");
         }
         if (req.getEmail() == null || req.getEmail().isBlank()) {
-            throw new ValidationException("Email не может быть пустым");
+            throw new InvalidRequestException("Email не может быть пустым");  // ← ИЗМЕНЕНО
+        }
+        if (req.getName() == null || req.getName().isBlank()) {
+            throw new InvalidRequestException("Имя не может быть пустым");  // ← ДОБАВЛЕНО
         }
     }
 
