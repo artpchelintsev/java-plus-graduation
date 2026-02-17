@@ -135,4 +135,24 @@ public class ErrorHandler {
                 LocalDateTime.now()
         );
     }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiError handleDataIntegrity(final org.springframework.dao.DataIntegrityViolationException e) {
+        String message = "Integrity constraint has been violated.";
+        if (e.getMostSpecificCause() != null && e.getMostSpecificCause().getMessage() != null) {
+            String causeMsg = e.getMostSpecificCause().getMessage();
+            if (causeMsg.contains("value too long")) {
+                message = "Field value exceeds maximum length";
+            } else if (causeMsg.contains("unique constraint") || causeMsg.contains("duplicate key")) {
+                message = "Duplicate value not allowed";
+            }
+        }
+        return new ApiError(
+                "Integrity constraint has been violated.",
+                message,
+                "CONFLICT",
+                LocalDateTime.now()
+        );
+    }
 }

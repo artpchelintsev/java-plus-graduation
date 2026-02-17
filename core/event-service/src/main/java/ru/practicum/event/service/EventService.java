@@ -32,10 +32,7 @@ import ru.practicum.event.dto.request.UserEventsQuery;
 import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.event.model.EventState;
-import ru.practicum.exception.ExistException;
-import ru.practicum.exception.InvalidDateRangeException;
-import ru.practicum.exception.NotFoundException;
-import ru.practicum.exception.ValidationException;
+import ru.practicum.exception.*;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -90,7 +87,7 @@ public class EventService {
         if (eventDto.getEventDate() != null) {
             LocalDateTime now = LocalDateTime.now();
             if (eventDto.getEventDate().isBefore(now.plusHours(2))) {
-                throw new ValidationException("Event date must be at least 2 hours in the future");
+                throw new InvalidRequestException("Event date must be at least 2 hours in the future");
             }
         }
 
@@ -138,7 +135,7 @@ public class EventService {
         if (updateRequest.getEventDate() != null) {
             LocalDateTime now = LocalDateTime.now();
             if (updateRequest.getEventDate().isBefore(now.plusHours(2))) {
-                throw new ValidationException("Event date must be at least 2 hours in the future");
+                throw new InvalidRequestException("Event date must be at least 2 hours in the future");
             }
         }
 
@@ -250,7 +247,7 @@ public class EventService {
         if (adminRequest.getEventDate() != null) {
             LocalDateTime now = LocalDateTime.now();
             if (adminRequest.getEventDate().isBefore(now.plusHours(1))) {
-                throw new ExistException("Event date must be at least one hour in the future to publish.");
+                throw new InvalidRequestException("Event date must be at least one hour in the future to publish.");
             }
         }
 
