@@ -12,6 +12,7 @@ import java.util.List;
 @Mapper(componentModel = "spring", uses = {CategoryMapper.class})
 public interface EventMapper {
 
+    @Mapping(target = "id", source = "id")
     @Mapping(source = "event.eventDate", target = "eventDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "initiator", ignore = true)
@@ -19,6 +20,7 @@ public interface EventMapper {
     @Mapping(target = "views", ignore = true)
     EventFullDto toEventFullDto(Event event);
 
+    @Mapping(target = "id", source = "id")
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "initiator", ignore = true)
     @Mapping(target = "confirmedRequests", ignore = true)
