@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.client.EventFeignClient;
 import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
-import ru.practicum.dto.request.ConfirmedRequestCount;
+import ru.practicum.dto.ConfirmedRequestCount;
 import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
 import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.RequestDto;
