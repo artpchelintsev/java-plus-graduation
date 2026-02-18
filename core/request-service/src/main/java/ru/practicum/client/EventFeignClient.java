@@ -7,7 +7,8 @@ import ru.practicum.dto.event.EventFullDto;
 
 @FeignClient(
         name = "event-service",
-        fallback = EventFeignClientFallback.class
+        fallback = EventFeignClientFallback.class,
+        configuration = FeignConfig.class
 )
 public interface EventFeignClient {
 

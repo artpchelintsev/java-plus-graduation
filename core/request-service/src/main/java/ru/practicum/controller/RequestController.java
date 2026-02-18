@@ -1,5 +1,7 @@
 package ru.practicum.controller;
 
+import feign.FeignException;
+import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -10,6 +12,7 @@ import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.RequestDto;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.exception.ConflictException;
+import ru.practicum.exception.ValidationException;
 import ru.practicum.mapper.RequestMapper;
 import ru.practicum.service.RequestServiceImpl;
 
@@ -53,15 +56,35 @@ public class RequestController {
             @PathVariable Long userId,
             @PathVariable Long eventId,
             @RequestBody EventRequestStatusUpdateRequest updateRequest) {
+
         log.info("Changing request status for event {} by user {}", eventId, userId);
+
         try {
             return service.changeRequestStatus(userId, eventId, updateRequest);
         } catch (ConflictException e) {
             log.error("Conflict when changing request status: {}", e.getMessage());
             throw e;
-        } catch (Exception e) {
-            log.error("Error when changing request status", e);
+        } catch (ValidationException e) {
+            log.error("Validation error when changing request status: {}", e.getMessage());
+            throw e;
+        } catch (FeignException.NotFound e) {
+            log.error("Event not found: {}", eventId);
+            throw new NotFoundException("Event not found: " + eventId);
+        } catch (FeignException.Conflict e) {
+            log.error("Conflict in event service: {}", e.getMessage());
             throw new ConflictException(e.getMessage());
+        } catch (FeignException e) {
+            log.error("Feign error when changing request status: {}", e.getMessage());
+            if (e.status() == 409) {
+                throw new ConflictException(e.getMessage());
+            } else if (e.status() == 404) {
+                throw new NotFoundException(e.getMessage());
+            } else {
+                throw new ConflictException("Error updating request status: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Unexpected error when changing request status", e);
+            throw new ConflictException("Internal server error");
         }
     }
 }
