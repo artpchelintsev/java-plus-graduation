@@ -92,17 +92,22 @@ public class EventService {
         Event event = eventMapper.fromNewEventDto(eventDto);
         event.setInitiatorId(userId);
         event.setState(EventState.PENDING);
+        event.setCreatedOn(LocalDateTime.now());
 
         Event savedItem = eventRepository.save(event);
+
+        EventFullDto dto = eventMapper.toEventFullDto(savedItem);
+        enrichWithInitiator(dto, userId);
 
         return eventMapper.toEventFullDto(savedItem);
     }
 
     public EventFullDto findUserEventById(long userId, long eventId) {
-        EventFullDto dto = eventMapper.toEventFullDto(findByIdAndUser(eventId, userId));
-        if (dto != null) {
+        Event event = findByIdAndUser(eventId, userId);
+        EventFullDto dto = eventMapper.toEventFullDto(event);
 
-            enrichWithInitiator(dto, dto.getInitiator().getId());
+        if (dto != null) {
+            enrichWithInitiator(dto, event.getInitiatorId());
 
             setConfirmedRequestsForEvents(List.of(dto));
 
@@ -158,7 +163,7 @@ public class EventService {
     public EventFullDto updateUserEvent(Long userId, Long eventId, UpdateEventUserRequest updateRequest) {
         Event event = findByIdAndUser(eventId, userId);
         if (event.getState().equals(EventState.PUBLISHED)) {
-            throw new ExistException("Only pending or canceled events can be changed");
+            throw new ConflictException("Only pending or canceled events can be changed");
         }
 
         if (updateRequest.getEventDate() != null) {
@@ -284,16 +289,23 @@ public class EventService {
 
         if (adminRequest.getStateAction() != null) {
             if (event.getState().equals(EventState.PENDING)) {
-                if (adminRequest.getStateAction().equals(AdminStateAction.PUBLISH_EVENT))
+                if (adminRequest.getStateAction().equals(AdminStateAction.PUBLISH_EVENT)) {
                     event.setState(EventState.PUBLISHED);
-                if (adminRequest.getStateAction().equals(AdminStateAction.REJECT_EVENT))
+                    event.setPublishedOn(LocalDateTime.now());
+                }
+                if (adminRequest.getStateAction().equals(AdminStateAction.REJECT_EVENT)) {
                     event.setState(EventState.CANCELED);
+                }
             } else {
-                throw new ExistException("Cannot publish the event because it's not in the right state: PUBLISHED");
+                throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getState());  // ИСПРАВЛЕНО
             }
         }
 
-        return eventMapper.toEventFullDto(eventRepository.save(event));
+        Event savedEvent = eventRepository.save(event);
+        EventFullDto dto = eventMapper.toEventFullDto(savedEvent);
+        enrichWithInitiator(dto, event.getInitiatorId());
+
+        return dto;
     }
 
     public void ensureUserIsInitiator(Long userId, Long eventId) {

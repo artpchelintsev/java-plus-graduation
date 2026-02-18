@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.category.dto.CategoryDto;
+import ru.practicum.dto.event.CategoryDto;
 import ru.practicum.category.dto.NewCategoryDto;
 import ru.practicum.category.mapper.CategoryMapper;
 import ru.practicum.category.model.Category;
@@ -59,15 +59,13 @@ public class CategoryServiceImpl implements CategoryService {
             throw new ValidationException("Категория с таким именем уже существует!");
         }
 
-        mapper.updateFromDto(categoryDto, existing);
-        existing.setId(catId);
+        existing.setName(categoryDto.getName());
         Category saved = categoryRepository.save(existing);
         return mapper.toDto(saved);
     }
 
     @Override
     public List<CategoryDto> getCategories(int from, int size) {
-
         int page = from / size;
         List<Category> list = categoryRepository.findAll(PageRequest.of(page, size)).getContent();
         return list.stream()
