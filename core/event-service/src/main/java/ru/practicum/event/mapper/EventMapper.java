@@ -14,15 +14,15 @@ public interface EventMapper {
 
     @Mapping(target = "id", source = "id")
     @Mapping(source = "event.eventDate", target = "eventDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @Mapping(target = "category", ignore = true)
-    @Mapping(target = "initiator", ignore = true)
+    @Mapping(target = "category", source = "categoryId")
+    @Mapping(target = "initiator", source = "initiatorId")
     @Mapping(target = "confirmedRequests", ignore = true)
     @Mapping(target = "views", ignore = true)
     EventFullDto toEventFullDto(Event event);
 
     @Mapping(target = "id", source = "id")
-    @Mapping(target = "category", ignore = true)
-    @Mapping(target = "initiator", ignore = true)
+    @Mapping(target = "category", source = "categoryId")
+    @Mapping(target = "initiator", source = "initiatorId")
     @Mapping(target = "confirmedRequests", ignore = true)
     @Mapping(target = "views", ignore = true)
     EventShortDto toEventShortDto(Event event);
