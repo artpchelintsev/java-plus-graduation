@@ -5,7 +5,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.RequestDto;
-import ru.practicum.dto.request.RequestStatsDto;
 import ru.practicum.service.RequestServiceImpl;
 
 import java.util.List;
@@ -32,10 +31,5 @@ public class RequestController {
     @PatchMapping("/requests/{requestId}/cancel")
     public ResponseEntity<RequestDto> cancelRequest(@PathVariable Long userId, @PathVariable Long requestId) {
         return ResponseEntity.ok(service.cancelRequest(userId, requestId));
-    }
-
-    @PostMapping("/requests/stats")
-    public RequestStatsDto getRequestStats(@RequestBody List<Long> eventIds) {
-        return service.getRequestStatsByEvents(eventIds);  // Исправлено: service вместо requestService
     }
 }
