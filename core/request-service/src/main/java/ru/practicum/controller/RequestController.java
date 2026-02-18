@@ -1,7 +1,7 @@
 package ru.practicum.controller;
 
 import feign.FeignException;
-import jakarta.ws.rs.NotFoundException;
+import ru.practicum.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

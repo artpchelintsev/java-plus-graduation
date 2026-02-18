@@ -291,6 +291,7 @@ public class EventService {
 
     public EventFullDto findPublicEventById(long id) {
         Event event = findByPublicId(id);
+        saveHit();
         EventFullDto dto = eventMapper.toEventFullDto(event);
 
         if (dto != null) {
@@ -301,7 +302,7 @@ public class EventService {
             String uri = "/events/" + dto.getId();
             Map<String, Long> hits = fetchHitsForUris(List.of(uri));
             dto.setViews(hits.getOrDefault(uri, 0L));
-            saveHit();
+
         }
 
         return dto;

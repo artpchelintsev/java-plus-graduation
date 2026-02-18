@@ -2,6 +2,7 @@ package ru.practicum.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -57,6 +58,18 @@ public class GlobalExceptionHandler {
                 .message(e.getMessage())
                 .reason("Internal server error")
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.toString())
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleMissingParams(MissingServletRequestParameterException e) {
+        log.error("Missing parameter: {}", e.getMessage());
+        return ApiError.builder()
+                .message(e.getMessage())
+                .reason("Отсутствует обязательный параметр запроса: " + e.getParameterName())
+                .status(HttpStatus.BAD_REQUEST.toString())
                 .timestamp(LocalDateTime.now())
                 .build();
     }
