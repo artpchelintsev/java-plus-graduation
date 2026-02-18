@@ -13,6 +13,7 @@ import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
+import ru.practicum.dto.event.EventBatchDto;
 import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.dto.event.EventShortDto;
 import ru.practicum.dto.request.RequestStatsDto;
@@ -35,10 +36,7 @@ import ru.practicum.event.model.EventState;
 import ru.practicum.exception.*;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -113,6 +111,37 @@ public class EventService {
             dto.setViews(hits.getOrDefault(uri, 0L));
         }
         return dto;
+    }
+
+    public EventBatchDto getEventsByIds(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return EventBatchDto.builder()
+                    .events(new HashMap<>())
+                    .build();
+        }
+
+        List<Event> events = eventRepository.findAllById(eventIds);
+        List<EventShortDto> eventDtos = eventMapper.toEventsShortDto(events);
+
+        if (eventDtos != null && !eventDtos.isEmpty()) {
+            enrichWithInitiators(eventDtos);
+            enrichWithConfirmedRequests(eventDtos);
+
+            List<String> uris = eventDtos.stream()
+                    .map(d -> "/events/" + d.getId())
+                    .collect(Collectors.toList());
+            Map<String, Long> hits = fetchHitsForUris(uris);
+            for (EventShortDto dto : eventDtos) {
+                dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
+            }
+        }
+
+        Map<Long, EventShortDto> eventMap = eventDtos.stream()
+                .collect(Collectors.toMap(EventShortDto::getId, dto -> dto));
+
+        return EventBatchDto.builder()
+                .events(eventMap)
+                .build();
     }
 
     private Event findByPublicId(long eventId) {
@@ -400,4 +429,5 @@ public class EventService {
             return Map.of();
         }
     }
+
 }

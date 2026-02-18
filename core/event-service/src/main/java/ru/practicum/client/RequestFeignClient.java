@@ -9,8 +9,10 @@ import java.util.List;
 
 @FeignClient(
         name = "request-service",
+        configuration = FeignErrorDecoder.class,
         fallback = RequestFeignClientFallback.class
 )
+
 public interface RequestFeignClient {
 
     @PostMapping("/requests/stats")
