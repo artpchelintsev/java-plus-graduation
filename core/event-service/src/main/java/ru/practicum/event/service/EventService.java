@@ -56,9 +56,8 @@ public class EventService {
                 PageRequest.of(query.from() / query.size(), query.size())));
 
         if (dtos != null && !dtos.isEmpty()) {
-
             enrichWithInitiators(dtos);
-
+            enrichWithCategories(dtos);
             enrichWithConfirmedRequests(dtos);
 
             List<String> uris = dtos.stream()
@@ -71,7 +70,65 @@ public class EventService {
             }
         }
 
-        return dtos;
+        return dtos != null ? dtos : Collections.emptyList();
+    }
+
+    private void enrichWithCategories(List<EventShortDto> events) {
+        if (events == null || events.isEmpty()) return;
+
+        try {
+            List<Long> categoryIds = events.stream()
+                    .map(e -> e.getCategory() != null ? e.getCategory().getId() : null)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (categoryIds.isEmpty()) return;
+
+            for (EventShortDto event : events) {
+                if (event.getCategory() != null && event.getCategory().getId() != null) {
+                    event.getCategory().setName("Category " + event.getCategory().getId());
+                }
+            }
+
+            log.debug("Enriched {} events with categories", events.size());
+        } catch (Exception e) {
+            log.error("Failed to enrich with categories", e);
+        }
+    }
+
+    private void enrichWithCategory(EventFullDto event) {
+        if (event == null || event.getCategory() == null || event.getCategory().getId() == null) return;
+
+        try {
+            event.getCategory().setName("Category " + event.getCategory().getId());
+        } catch (Exception e) {
+            log.error("Failed to enrich category for event {}: {}", event.getId(), e.getMessage());
+        }
+    }
+
+    private void enrichWithCategoriesForFullDto(List<EventFullDto> events) {
+        if (events == null || events.isEmpty()) return;
+
+        try {
+            List<Long> categoryIds = events.stream()
+                    .map(e -> e.getCategory() != null ? e.getCategory().getId() : null)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (categoryIds.isEmpty()) return;
+
+            for (EventFullDto event : events) {
+                if (event.getCategory() != null && event.getCategory().getId() != null) {
+                    event.getCategory().setName("Category " + event.getCategory().getId());
+                }
+            }
+
+            log.debug("Enriched {} events with categories", events.size());
+        } catch (Exception e) {
+            log.error("Failed to enrich with categories", e);
+        }
     }
 
     @Transactional
@@ -98,8 +155,9 @@ public class EventService {
 
         EventFullDto dto = eventMapper.toEventFullDto(savedItem);
         enrichWithInitiator(dto, userId);
+        enrichWithCategory(dto);
 
-        return eventMapper.toEventFullDto(savedItem);
+        return dto;
     }
 
     public EventFullDto findUserEventById(long userId, long eventId) {
@@ -108,7 +166,7 @@ public class EventService {
 
         if (dto != null) {
             enrichWithInitiator(dto, event.getInitiatorId());
-
+            enrichWithCategory(dto);
             setConfirmedRequestsForEvents(List.of(dto));
 
             String uri = "/events/" + dto.getId();
@@ -130,6 +188,7 @@ public class EventService {
 
         if (eventDtos != null && !eventDtos.isEmpty()) {
             enrichWithInitiators(eventDtos);
+            enrichWithCategories(eventDtos);
             enrichWithConfirmedRequests(eventDtos);
 
             List<String> uris = eventDtos.stream()
@@ -141,8 +200,10 @@ public class EventService {
             }
         }
 
-        Map<Long, EventShortDto> eventMap = eventDtos.stream()
-                .collect(Collectors.toMap(EventShortDto::getId, dto -> dto));
+        Map<Long, EventShortDto> eventMap = eventDtos != null ?
+                eventDtos.stream()
+                        .collect(Collectors.toMap(EventShortDto::getId, dto -> dto)) :
+                new HashMap<>();
 
         return EventBatchDto.builder()
                 .events(eventMap)
@@ -185,7 +246,12 @@ public class EventService {
             }
         }
 
-        return eventMapper.toEventFullDto(eventRepository.save(event));
+        Event savedEvent = eventRepository.save(event);
+        EventFullDto dto = eventMapper.toEventFullDto(savedEvent);
+        enrichWithInitiator(dto, userId);
+        enrichWithCategory(dto);
+
+        return dto;
     }
 
     public List<EventShortDto> searchPublicEvents(PublicEventFilter filter) {
@@ -199,6 +265,7 @@ public class EventService {
 
         if (dtos != null && !dtos.isEmpty()) {
             enrichWithInitiators(dtos);
+            enrichWithCategories(dtos);
             enrichWithConfirmedRequests(dtos);
 
             List<String> uris = dtos.stream().map(d -> "/events/" + d.getId()).collect(Collectors.toList());
@@ -206,11 +273,13 @@ public class EventService {
             for (EventShortDto dto : dtos) {
                 dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
             }
+        } else {
+            dtos = Collections.emptyList();
         }
 
         saveHit();
 
-        if (filter.getSort() != null && filter.getSort() == EventSort.VIEWS) {
+        if (filter.getSort() != null && filter.getSort() == EventSort.VIEWS && !dtos.isEmpty()) {
             dtos.sort(Comparator.comparing(EventShortDto::getViews).reversed());
         }
 
@@ -223,6 +292,7 @@ public class EventService {
 
         if (dto != null) {
             enrichWithInitiator(dto, event.getInitiatorId());
+            enrichWithCategory(dto);
             setConfirmedRequestsForEvents(List.of(dto));
 
             String uri = "/events/" + dto.getId();
@@ -237,10 +307,11 @@ public class EventService {
     public List<EventFullDto> searchEventsByAdmin(AdminEventFilter filter) {
         List<EventFullDto> dtos = eventMapper.toEventsFullDto(eventRepository.searchEventsByAdmin(filter));
 
-        enrichWithInitiatorsForFullDto(dtos);
-        setConfirmedRequestsForEvents(dtos);
-
         if (dtos != null && !dtos.isEmpty()) {
+            enrichWithInitiatorsForFullDto(dtos);
+            enrichWithCategoriesForFullDto(dtos);
+            setConfirmedRequestsForEvents(dtos);
+
             List<String> uris = dtos.stream()
                     .map(d -> "/events/" + d.getId())
                     .collect(Collectors.toList());
@@ -248,6 +319,8 @@ public class EventService {
             for (EventFullDto dto : dtos) {
                 dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
             }
+        } else {
+            dtos = Collections.emptyList();
         }
 
         return dtos;
@@ -259,7 +332,10 @@ public class EventService {
         try {
             List<Long> eventIds = dtos.stream()
                     .map(EventFullDto::getId)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
+
+            if (eventIds.isEmpty()) return;
 
             RequestStatsDto stats = requestFeignClient.getRequestStats(eventIds);
             Map<Long, Integer> confirmedRequestsMap = stats.getConfirmedRequests();
@@ -268,6 +344,9 @@ public class EventService {
                     confirmedRequestsMap.getOrDefault(dto.getId(), 0).longValue()));
 
             log.debug("Enriched {} events with confirmed requests", dtos.size());
+        } catch (FeignException e) {
+            log.error("Feign error when getting confirmed requests: {}", e.getMessage());
+            dtos.forEach(dto -> dto.setConfirmedRequests(0L));
         } catch (Exception e) {
             log.error("Failed to enrich with confirmed requests", e);
             dtos.forEach(dto -> dto.setConfirmedRequests(0L));
@@ -297,13 +376,14 @@ public class EventService {
                     event.setState(EventState.CANCELED);
                 }
             } else {
-                throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getState());  // ИСПРАВЛЕНО
+                throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getState());
             }
         }
 
         Event savedEvent = eventRepository.save(event);
         EventFullDto dto = eventMapper.toEventFullDto(savedEvent);
         enrichWithInitiator(dto, event.getInitiatorId());
+        enrichWithCategory(dto);
 
         return dto;
     }
@@ -335,12 +415,27 @@ public class EventService {
                     UserShortDto user = users.get(event.getInitiator().getId());
                     if (user != null) {
                         event.setInitiator(user);
+                    } else {
+                        event.setInitiator(UserShortDto.builder()
+                                .id(event.getInitiator().getId())
+                                .name("Unknown User")
+                                .build());
                     }
                 }
             }
 
             log.debug("Enriched {} events with initiators", events.size());
 
+        } catch (FeignException e) {
+            log.error("Feign error when getting users: {}", e.getMessage());
+            for (EventShortDto event : events) {
+                if (event.getInitiator() != null) {
+                    event.setInitiator(UserShortDto.builder()
+                            .id(event.getInitiator().getId())
+                            .name("Unknown User")
+                            .build());
+                }
+            }
         } catch (Exception e) {
             log.error("Failed to enrich with initiators", e);
         }
@@ -366,26 +461,54 @@ public class EventService {
                     UserShortDto user = users.get(event.getInitiator().getId());
                     if (user != null) {
                         event.setInitiator(user);
+                    } else {
+                        event.setInitiator(UserShortDto.builder()
+                                .id(event.getInitiator().getId())
+                                .name("Unknown User")
+                                .build());
                     }
                 }
             }
 
             log.debug("Enriched {} events with initiators", events.size());
 
+        } catch (FeignException e) {
+            log.error("Feign error when getting users: {}", e.getMessage());
+            for (EventFullDto event : events) {
+                if (event.getInitiator() != null) {
+                    event.setInitiator(UserShortDto.builder()
+                            .id(event.getInitiator().getId())
+                            .name("Unknown User")
+                            .build());
+                }
+            }
         } catch (Exception e) {
             log.error("Failed to enrich with initiators", e);
         }
     }
 
     private void enrichWithInitiator(EventFullDto event, Long initiatorId) {
+        if (event == null || initiatorId == null) return;
+
         try {
             UserDto user = userFeignClient.getUserById(initiatorId);
             event.setInitiator(UserShortDto.builder()
                     .id(user.getId())
                     .name(user.getName())
                     .build());
+        } catch (FeignException.NotFound e) {
+            log.error("User not found: {}", initiatorId);
+            event.setInitiator(UserShortDto.builder()
+                    .id(initiatorId)
+                    .name("Unknown User")
+                    .build());
         } catch (Exception e) {
-            log.error("Failed to enrich with initiator", e);
+            log.error("Failed to enrich with initiator for event {}: {}",
+                    event.getId(), e.getMessage());
+            event.setInitiator(UserShortDto.builder()
+                    .id(initiatorId)
+                    .name("Unknown")
+                    .build());
         }
     }
 
@@ -395,7 +518,10 @@ public class EventService {
         try {
             List<Long> eventIds = events.stream()
                     .map(EventShortDto::getId)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
+
+            if (eventIds.isEmpty()) return;
 
             RequestStatsDto stats = requestFeignClient.getRequestStats(eventIds);
             Map<Long, Integer> confirmedRequests = stats.getConfirmedRequests();
@@ -407,9 +533,12 @@ public class EventService {
 
             log.debug("Enriched {} events with confirmed requests", events.size());
 
+        } catch (FeignException e) {
+            log.error("Feign error when getting confirmed requests: {}", e.getMessage());
+            events.forEach(event -> event.setConfirmedRequests(0));
         } catch (Exception ex) {
             log.error("Failed to enrich with confirmed requests", ex);
-            events.forEach(e -> e.setConfirmedRequests(0));
+            events.forEach(event -> event.setConfirmedRequests(0));
         }
     }
 
@@ -441,5 +570,4 @@ public class EventService {
             return Map.of();
         }
     }
-
 }

@@ -1,5 +1,6 @@
 package ru.practicum.event.controller;
 
+import feign.FeignException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -18,7 +19,9 @@ import ru.practicum.event.dto.NewEventDto;
 import ru.practicum.event.dto.UpdateEventUserRequest;
 import ru.practicum.event.dto.request.UserEventsQuery;
 import ru.practicum.event.service.EventService;
+import ru.practicum.exception.ConflictException;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -62,17 +65,37 @@ public class PrivateEventController {
     @GetMapping("/{eventId}/requests")
     public List<ParticipationRequestDto> getEventRequests(@PathVariable Long userId,
                                                           @PathVariable Long eventId) {
-        eventService.ensureUserIsInitiator(userId, eventId);
-
-        return requestFeignClient.getEventRequests(userId, eventId);
+        try {
+            eventService.ensureUserIsInitiator(userId, eventId);
+            return requestFeignClient.getEventRequests(userId, eventId);
+        } catch (FeignException.NotFound e) {
+            log.error("Request service not found: {}", e.getMessage());
+            return Collections.emptyList();
+        } catch (FeignException e) {
+            log.error("Feign error when getting event requests: {}", e.getMessage());
+            if (e.status() == 409) {
+                throw new ConflictException("Conflict when getting event requests");
+            }
+            return Collections.emptyList();
+        }
     }
 
     @PatchMapping("/{eventId}/requests")
     public EventRequestStatusUpdateResult updateStatuses(@PathVariable Long userId,
                                                          @PathVariable Long eventId,
                                                          @RequestBody EventRequestStatusUpdateRequest request) {
-        eventService.ensureUserIsInitiator(userId, eventId);
-
-        return requestFeignClient.changeRequestStatus(userId, eventId, request);
+        try {
+            eventService.ensureUserIsInitiator(userId, eventId);
+            return requestFeignClient.changeRequestStatus(userId, eventId, request);
+        } catch (FeignException.NotFound e) {
+            log.error("Request service not found: {}", e.getMessage());
+            throw new ConflictException("Request service unavailable");
+        } catch (FeignException e) {
+            log.error("Feign error when updating request status: {}", e.getMessage());
+            if (e.status() == 409) {
+                throw new ConflictException("Conflict when updating request status");
+            }
+            throw new ConflictException("Error updating request status: " + e.getMessage());
+        }
     }
 }
