@@ -5,7 +5,7 @@ import ru.practicum.category.mapper.CategoryMapper;
 import ru.practicum.event.dto.*;
 import ru.practicum.event.model.Event;
 import ru.practicum.dto.event.EventFullDto;
-import ru.practicum.event.dto.EventShortDto;
+import ru.practicum.dto.event.EventShortDto;
 
 import java.util.List;
 

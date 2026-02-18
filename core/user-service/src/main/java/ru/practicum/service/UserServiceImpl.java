@@ -89,11 +89,51 @@ public class UserServiceImpl implements UserService {
         if (req == null) {
             throw new InvalidRequestException("Запрос на добавление пользователя не должен быть пустым");
         }
+
         if (req.getEmail() == null || req.getEmail().isBlank()) {
-            throw new InvalidRequestException("Email не может быть пустым");  // ← ИЗМЕНЕНО
+            throw new InvalidRequestException("Email не может быть пустым");
         }
+
+        String email = req.getEmail().trim();
+
+        if (email.length() < 6) {
+            throw new InvalidRequestException("Email должен содержать минимум 6 символов");
+        }
+        if (email.length() > 254) {
+            throw new InvalidRequestException("Email не может быть длиннее 254 символов");
+        }
+
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 0 || atIndex >= email.length() - 1) {
+            throw new InvalidRequestException("Некорректный формат Email");
+        }
+
+        String localPart = email.substring(0, atIndex);
+        if (localPart.length() > 64) {
+            throw new InvalidRequestException("Локальная часть Email не может быть длиннее 64 символов");
+        }
+
+        String domain = email.substring(atIndex + 1);
+        if (domain.contains(".")) {
+            String[] domainParts = domain.split("\\.");
+            for (String part : domainParts) {
+                if (part.length() > 63) {
+                    throw new InvalidRequestException("Часть домена Email не может быть длиннее 63 символов");
+                }
+            }
+        }
+
         if (req.getName() == null || req.getName().isBlank()) {
-            throw new InvalidRequestException("Имя не может быть пустым");  // ← ДОБАВЛЕНО
+            throw new InvalidRequestException("Имя не может быть пустым");
+        }
+
+        String name = req.getName().trim();
+
+        if (name.length() < 2) {
+            throw new InvalidRequestException("Имя должно содержать минимум 2 символа");
+        }
+        if (req.getName().length() > 250) {
+            throw new InvalidRequestException("Имя не может быть длиннее 250 символов");
         }
     }
 

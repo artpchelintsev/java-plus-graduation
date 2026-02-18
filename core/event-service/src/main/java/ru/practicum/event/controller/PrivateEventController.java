@@ -10,8 +10,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.client.RequestFeignClient;
 import ru.practicum.dto.event.EventFullDto;
+import ru.practicum.dto.event.EventShortDto;
 import ru.practicum.dto.request.ParticipationRequestDto;
-import ru.practicum.event.dto.EventShortDto;
 import ru.practicum.event.dto.NewEventDto;
 import ru.practicum.event.dto.UpdateEventUserRequest;
 import ru.practicum.event.dto.request.UserEventsQuery;
@@ -60,10 +60,8 @@ public class PrivateEventController {
     @GetMapping("/{eventId}/requests")
     public List<ParticipationRequestDto> getEventRequests(@PathVariable Long userId,
                                                           @PathVariable Long eventId) {
-        // Проверяем что пользователь - инициатор события
         eventService.ensureUserIsInitiator(userId, eventId);
 
-        // Делегируем в request-service через Feign
         return requestFeignClient.getEventRequests(userId, eventId);
     }
 
@@ -71,10 +69,8 @@ public class PrivateEventController {
     public Object updateStatuses(@PathVariable Long userId,
                                  @PathVariable Long eventId,
                                  @RequestBody Object request) {
-        // Проверяем что пользователь - инициатор события
         eventService.ensureUserIsInitiator(userId, eventId);
 
-        // Делегируем в request-service через Feign
         return requestFeignClient.changeRequestStatus(userId, eventId, request);
     }
 }

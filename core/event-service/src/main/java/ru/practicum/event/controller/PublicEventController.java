@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.practicum.dto.event.EventFullDto;
-import ru.practicum.event.dto.EventShortDto;
+import ru.practicum.dto.event.EventShortDto;
 import ru.practicum.event.dto.request.PublicEventFilter;
 import ru.practicum.event.service.EventService;
 

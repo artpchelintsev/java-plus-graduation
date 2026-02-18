@@ -66,11 +66,11 @@ public class RequestServiceImpl implements RequestService {
         }
 
         if (Objects.equals(event.getInitiator().getId(), userId)) {
-            throw new ValidationException("Инициатор события не может создать заявку на участие в своём же событии");
+            throw new ConflictException("Инициатор события не может создать заявку на участие в своём же событии");
         }
 
         if (event.getState() == null || !"PUBLISHED".equals(event.getState())) {
-            throw new ValidationException("Нельзя добавить заявку: событие не опубликовано");
+            throw new ConflictException("Нельзя добавить заявку: событие не опубликовано");
         }
 
         if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {
@@ -111,7 +111,7 @@ public class RequestServiceImpl implements RequestService {
         Request request = entityValidator.ensureAndGet(requestRepository, requestId, "Заявка");
 
         if (!Objects.equals(request.getRequesterId(), userId)) {
-            throw new ValidationException("Пользователь может отменять только свои заявки");
+            throw new ConflictException("Пользователь может отменять только свои заявки");
         }
 
         request.setStatus(RequestStatus.CANCELED);
@@ -160,7 +160,7 @@ public class RequestServiceImpl implements RequestService {
         }
 
         if (!Objects.equals(event.getInitiator().getId(), userId)) {
-            throw new ValidationException("Только инициатор может менять статусы заявок");
+            throw new ConflictException("Только инициатор может менять статусы заявок");
         }
 
         String statusStr = Optional.ofNullable(updateRequest.getStatus())
