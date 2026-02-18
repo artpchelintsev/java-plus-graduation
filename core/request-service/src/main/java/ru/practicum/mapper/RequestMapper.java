@@ -3,6 +3,7 @@ package ru.practicum.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import ru.practicum.dto.RequestDto;
+import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.model.Request;
 
 import java.util.List;
@@ -16,4 +17,8 @@ public interface RequestMapper {
     RequestDto toDto(Request request);
 
     List<RequestDto> toDtoList(List<Request> requests);
+
+    ParticipationRequestDto toParticipationDto(RequestDto requestDto);
+
+    List<ParticipationRequestDto> toParticipationDtoList(List<RequestDto> requests);
 }
