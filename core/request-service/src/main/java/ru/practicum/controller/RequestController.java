@@ -1,6 +1,7 @@
 package ru.practicum.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +9,7 @@ import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
 import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.RequestDto;
 import ru.practicum.dto.request.ParticipationRequestDto;
+import ru.practicum.exception.ConflictException;
 import ru.practicum.mapper.RequestMapper;
 import ru.practicum.service.RequestServiceImpl;
 
@@ -16,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/users/{userId}")
 @RequiredArgsConstructor
+@Slf4j
 public class RequestController {
 
     private final RequestServiceImpl service;
@@ -50,6 +53,15 @@ public class RequestController {
             @PathVariable Long userId,
             @PathVariable Long eventId,
             @RequestBody EventRequestStatusUpdateRequest updateRequest) {
-        return service.changeRequestStatus(userId, eventId, updateRequest);
+        log.info("Changing request status for event {} by user {}", eventId, userId);
+        try {
+            return service.changeRequestStatus(userId, eventId, updateRequest);
+        } catch (ConflictException e) {
+            log.error("Conflict when changing request status: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error when changing request status", e);
+            throw new ConflictException(e.getMessage());
+        }
     }
 }

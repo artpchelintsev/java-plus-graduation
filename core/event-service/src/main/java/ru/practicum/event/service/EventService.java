@@ -268,7 +268,10 @@ public class EventService {
             enrichWithCategories(dtos);
             enrichWithConfirmedRequests(dtos);
 
-            List<String> uris = dtos.stream().map(d -> "/events/" + d.getId()).collect(Collectors.toList());
+            List<String> uris = dtos.stream()
+                    .map(d -> "/events/" + d.getId())
+                    .collect(Collectors.toList());
+
             Map<String, Long> hits = fetchHitsForUris(uris);
             for (EventShortDto dto : dtos) {
                 dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));

@@ -8,13 +8,12 @@ import ru.practicum.client.EventFeignClient;
 import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.ConfirmedRequestCount;
+import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
 import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.RequestDto;
-import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.dto.request.RequestStatsDto;
 import ru.practicum.exception.ConflictException;
-import ru.practicum.exception.ExistException;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.exception.ValidationException;
 import ru.practicum.mapper.RequestMapper;
@@ -74,7 +73,7 @@ public class RequestServiceImpl implements RequestService {
         }
 
         if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {
-            throw new ExistException("Заявка от этого пользователя на это событие уже существует");
+            throw new ConflictException("Заявка от этого пользователя на это событие уже существует");
         }
 
         long confirmed = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
@@ -112,6 +111,10 @@ public class RequestServiceImpl implements RequestService {
 
         if (!Objects.equals(request.getRequesterId(), userId)) {
             throw new ConflictException("Пользователь может отменять только свои заявки");
+        }
+
+        if (request.getStatus() == RequestStatus.CONFIRMED) {
+            throw new ConflictException("Нельзя отменить уже подтвержденную заявку");
         }
 
         request.setStatus(RequestStatus.CANCELED);
@@ -189,54 +192,53 @@ public class RequestServiceImpl implements RequestService {
 
         List<Request> requests = requestRepository.findByEventIdAndIdIn(eventId, ids);
 
+        for (Request req : requests) {
+            if (req.getStatus() != RequestStatus.PENDING) {
+                throw new ConflictException("Можно обрабатывать только заявки в статусе PENDING");
+            }
+        }
+
         long confirmedNow = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
         Integer limit = event.getParticipantLimit();
-
-        if (targetStatus == RequestStatus.CONFIRMED && limit != null && limit > 0) {
-            long pendingToConfirm = requests.stream()
-                    .filter(r -> r.getStatus() == RequestStatus.PENDING)
-                    .count();
-            long available = limit - confirmedNow;
-            if (available <= 0 || pendingToConfirm > available) {
-                throw new ConflictException("Достигнут лимит участников события");
-            }
-        }
-
-        if (targetStatus == RequestStatus.REJECTED) {
-            boolean anyNonPending = requests.stream()
-                    .anyMatch(r -> r.getStatus() != RequestStatus.PENDING);
-            if (anyNonPending) {
-                throw new ConflictException("Нельзя отклонить заявку: она уже обработана");
-            }
-        }
 
         List<Request> confirmed = new ArrayList<>();
         List<Request> rejected = new ArrayList<>();
 
         if (targetStatus == RequestStatus.CONFIRMED) {
-            for (Request req : requests) {
-                if (req.getStatus() != RequestStatus.PENDING) continue;
-
-                if (limit == null || limit == 0 || confirmedNow < limit) {
-                    req.setStatus(RequestStatus.CONFIRMED);
-                    confirmedNow++;
-                    confirmed.add(req);
+            if (limit != null && limit > 0) {
+                long available = limit - confirmedNow;
+                if (available < requests.size()) {
+                    for (int i = 0; i < requests.size(); i++) {
+                        Request req = requests.get(i);
+                        if (i < available) {
+                            req.setStatus(RequestStatus.CONFIRMED);
+                            confirmed.add(req);
+                        } else {
+                            req.setStatus(RequestStatus.REJECTED);
+                            rejected.add(req);
+                        }
+                    }
                 } else {
-                    req.setStatus(RequestStatus.REJECTED);
-                    rejected.add(req);
+                    for (Request req : requests) {
+                        req.setStatus(RequestStatus.CONFIRMED);
+                        confirmed.add(req);
+                    }
+                }
+            } else {
+                for (Request req : requests) {
+                    req.setStatus(RequestStatus.CONFIRMED);
+                    confirmed.add(req);
                 }
             }
-        } else {
+        } else if (targetStatus == RequestStatus.REJECTED) {
             for (Request req : requests) {
-                if (req.getStatus() == RequestStatus.PENDING) {
-                    req.setStatus(RequestStatus.REJECTED);
-                    rejected.add(req);
-                }
+                req.setStatus(RequestStatus.REJECTED);
+                rejected.add(req);
             }
         }
 
-        confirmed.forEach(requestRepository::save);
-        rejected.forEach(requestRepository::save);
+        requestRepository.saveAll(confirmed);
+        requestRepository.saveAll(rejected);
 
         return EventRequestStatusUpdateResult.builder()
                 .confirmedRequests(mapper.toDtoList(confirmed))
