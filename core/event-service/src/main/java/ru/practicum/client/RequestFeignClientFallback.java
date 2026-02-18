@@ -2,6 +2,8 @@ package ru.practicum.client;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
+import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.dto.request.RequestStatsDto;
 
@@ -26,7 +28,7 @@ public class RequestFeignClientFallback implements RequestFeignClient {
     }
 
     @Override
-    public Object changeRequestStatus(Long userId, Long eventId, Object updateRequest) {
+    public EventRequestStatusUpdateResult changeRequestStatus(Long userId, Long eventId, EventRequestStatusUpdateRequest updateRequest) {
         log.error("Request Service unavailable for status change");
         throw new RuntimeException("Request Service is temporarily unavailable");
     }

@@ -2,6 +2,8 @@ package ru.practicum.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
+import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.dto.request.RequestStatsDto;
 
@@ -24,8 +26,8 @@ public interface RequestFeignClient {
             @PathVariable Long eventId);
 
     @PatchMapping("/users/{userId}/events/{eventId}/requests")
-    Object changeRequestStatus(
+    EventRequestStatusUpdateResult changeRequestStatus(
             @PathVariable Long userId,
             @PathVariable Long eventId,
-            @RequestBody Object updateRequest);
+            @RequestBody EventRequestStatusUpdateRequest updateRequest);
 }

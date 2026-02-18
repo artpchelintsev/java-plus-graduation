@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.client.RequestFeignClient;
+import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
+import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.dto.event.EventShortDto;
 import ru.practicum.dto.request.ParticipationRequestDto;
@@ -66,9 +68,9 @@ public class PrivateEventController {
     }
 
     @PatchMapping("/{eventId}/requests")
-    public Object updateStatuses(@PathVariable Long userId,
-                                 @PathVariable Long eventId,
-                                 @RequestBody Object request) {
+    public EventRequestStatusUpdateResult updateStatuses(@PathVariable Long userId,
+                                                         @PathVariable Long eventId,
+                                                         @RequestBody EventRequestStatusUpdateRequest request) {
         eventService.ensureUserIsInitiator(userId, eventId);
 
         return requestFeignClient.changeRequestStatus(userId, eventId, request);
