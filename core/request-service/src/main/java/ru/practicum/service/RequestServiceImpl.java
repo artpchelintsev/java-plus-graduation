@@ -207,6 +207,9 @@ public class RequestServiceImpl implements RequestService {
         if (targetStatus == RequestStatus.CONFIRMED) {
             if (limit != null && limit > 0) {
                 long available = limit - confirmedNow;
+                if (available <= 0) {
+                    throw new ConflictException("Достигнут лимит участников события");
+                }
                 if (available < requests.size()) {
                     for (int i = 0; i < requests.size(); i++) {
                         Request req = requests.get(i);
