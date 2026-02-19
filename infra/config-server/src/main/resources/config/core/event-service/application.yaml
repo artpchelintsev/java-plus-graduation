@@ -17,6 +17,10 @@ spring:
         jdbc.time_zone: UTC
   sql.init.mode: always
 
+feign:
+  okhttp:
+    enabled: true
+
 logging.level.org.springframework:
   web.client.RestTemplate: DEBUG
   orm:

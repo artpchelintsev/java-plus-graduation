@@ -12,6 +12,6 @@ import ru.practicum.dto.event.EventFullDto;
 )
 public interface EventFeignClient {
 
-    @GetMapping("/events/{eventId}")
+    @GetMapping("/events/{eventId}/internal")
     EventFullDto getEventById(@PathVariable Long eventId);
 }

@@ -3,6 +3,7 @@ package ru.practicum.event.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.event.EventBatchDto;
+import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.event.service.EventService;
 
 import java.util.List;
@@ -17,5 +18,10 @@ public class InternalEventController {
     @PostMapping("/batch")
     public EventBatchDto getEventsByIds(@RequestBody List<Long> eventIds) {
         return eventService.getEventsByIds(eventIds);
+    }
+
+    @GetMapping("/{eventId}/internal")
+    public EventFullDto getEventByIdInternal(@PathVariable Long eventId) {
+        return eventService.getEventByIdInternal(eventId);
     }
 }

@@ -308,6 +308,12 @@ public class EventService {
         return dto;
     }
 
+    public EventFullDto getEventByIdInternal(Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        return eventMapper.toEventFullDto(event);
+    }
+
     public List<EventFullDto> searchEventsByAdmin(AdminEventFilter filter) {
         List<EventFullDto> dtos = eventMapper.toEventsFullDto(eventRepository.searchEventsByAdmin(filter));
 
