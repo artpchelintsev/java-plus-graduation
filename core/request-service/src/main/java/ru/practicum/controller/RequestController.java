@@ -87,4 +87,12 @@ public class RequestController {
             throw new ConflictException("Internal server error");
         }
     }
+
+    @PostMapping("/events/{eventId}/requests/status")
+    public EventRequestStatusUpdateResult changeRequestStatusInternal(
+            @PathVariable Long userId,
+            @PathVariable Long eventId,
+            @RequestBody EventRequestStatusUpdateRequest updateRequest) {
+        return service.changeRequestStatus(userId, eventId, updateRequest);
+    }
 }

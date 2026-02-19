@@ -25,7 +25,7 @@ public interface RequestFeignClient {
             @PathVariable Long userId,
             @PathVariable Long eventId);
 
-    @PatchMapping("/users/{userId}/events/{eventId}/requests")
+    @PostMapping("/users/{userId}/events/{eventId}/requests/status")
     EventRequestStatusUpdateResult changeRequestStatus(
             @PathVariable Long userId,
             @PathVariable Long eventId,
