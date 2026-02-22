@@ -80,11 +80,8 @@ public class RequestController {
             } else if (e.status() == 404) {
                 throw new NotFoundException(e.getMessage());
             } else {
-                throw new ConflictException("Error updating request status: " + e.getMessage());
+                throw new RuntimeException("Error calling request-service: " + e.getMessage(), e);
             }
-        } catch (Exception e) {
-            log.error("Unexpected error when changing request status", e);
-            throw new ConflictException("Internal server error");
         }
     }
 
