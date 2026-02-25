@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import ru.practicum.client.RequestFeignClient;
-import ru.practicum.client.StatsClient;
+import ru.practicum.controller.StatsClient;
 import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
 import ru.practicum.dto.EndpointHitDto;
