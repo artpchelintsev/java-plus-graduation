@@ -22,11 +22,11 @@ public interface UserActionMapper {
     UserActionAvro mapToAvro(UserActionProto proto);
 
     @Named("mapTimestamp")
-    default Instant mapToInstant(Timestamp timestamp) {
+    default long mapToTimestamp(Timestamp timestamp) {
         if (timestamp == null) {
-            return null;
+            return 0L;
         }
-        return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
+        return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).toEpochMilli();
     }
 
     @Named("mapActionType")

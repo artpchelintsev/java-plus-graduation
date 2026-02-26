@@ -2,11 +2,13 @@ package ru.practicum.service;
 
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.client.EventFeignClient;
 import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
+import ru.practicum.controller.UserActionClient;
 import ru.practicum.dto.ConfirmedRequestCount;
 import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.dto.request.EventRequestStatusUpdateRequest;
@@ -20,7 +22,9 @@ import ru.practicum.mapper.RequestMapper;
 import ru.practicum.model.Request;
 import ru.practicum.model.RequestStatus;
 import ru.practicum.repository.RequestRepository;
+import ru.practicum.stats.proto.ActionTypeProto;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -28,6 +32,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RequestServiceImpl implements RequestService {
 
     private final RequestRepository requestRepository;
@@ -35,6 +40,7 @@ public class RequestServiceImpl implements RequestService {
     private final EventFeignClient eventFeignClient;
     private final RequestMapper mapper;
     private final EntityValidator entityValidator;
+    private final UserActionClient userActionClient;
 
     @Override
     public List<RequestDto> getUserRequests(Long userId) {
@@ -95,6 +101,11 @@ public class RequestServiceImpl implements RequestService {
                 .build();
 
         Request saved = requestRepository.save(request);
+        try {
+            userActionClient.sendUserAction(userId, eventId, ActionTypeProto.ACTION_REGISTER, Instant.now());
+        } catch (Exception e) {
+            log.warn("Failed to send register action to collector: {}", e.getMessage());
+        }
         return mapper.toDto(saved);
     }
 
@@ -269,5 +280,10 @@ public class RequestServiceImpl implements RequestService {
         return RequestStatsDto.builder()
                 .confirmedRequests(statsMap)
                 .build();
+    }
+
+    public boolean hasConfirmedRequest(long userId, long eventId) {
+        return requestRepository.existsByEventIdAndRequesterIdAndStatus(
+                eventId, userId, RequestStatus.CONFIRMED);
     }
 }

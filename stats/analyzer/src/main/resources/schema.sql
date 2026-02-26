@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS user_action CASCADE;
+DROP TABLE IF EXISTS event_similarity CASCADE;
+
 CREATE TABLE IF NOT EXISTS event_similarity (
     event_a BIGINT NOT NULL,
     event_b BIGINT NOT NULL,

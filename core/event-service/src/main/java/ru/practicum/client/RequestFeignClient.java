@@ -30,4 +30,8 @@ public interface RequestFeignClient {
             @PathVariable Long userId,
             @PathVariable Long eventId,
             @RequestBody EventRequestStatusUpdateRequest updateRequest);
+
+    @GetMapping("/internal/requests/confirmed")
+    boolean hasConfirmedRequest(@RequestParam("userId") long userId,
+                                @RequestParam("eventId") long eventId);
 }

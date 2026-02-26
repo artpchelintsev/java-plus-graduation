@@ -18,4 +18,11 @@ public class InternalRequestController {
     public RequestStatsDto getRequestStats(@RequestBody List<Long> eventIds) {
         return service.getRequestStatsByEvents(eventIds);
     }
+
+    @GetMapping("/confirmed")
+    public boolean hasConfirmedRequest(
+            @RequestParam long userId,
+            @RequestParam long eventId) {
+        return service.hasConfirmedRequest(userId, eventId);
+    }
 }

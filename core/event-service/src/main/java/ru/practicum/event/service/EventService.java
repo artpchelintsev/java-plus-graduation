@@ -1,18 +1,16 @@
 package ru.practicum.event.service;
 
 import feign.FeignException;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import ru.practicum.client.RequestFeignClient;
-import ru.practicum.controller.StatsClient;
 import ru.practicum.client.UserFeignClient;
 import ru.practicum.common.EntityValidator;
-import ru.practicum.dto.EndpointHitDto;
-import ru.practicum.dto.ViewStatsDto;
+import ru.practicum.controller.RecommendationsClient;
+import ru.practicum.controller.UserActionClient;
 import ru.practicum.dto.event.EventBatchDto;
 import ru.practicum.dto.event.EventFullDto;
 import ru.practicum.dto.event.EventShortDto;
@@ -34,7 +32,9 @@ import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.event.model.EventState;
 import ru.practicum.exception.*;
+import ru.practicum.stats.proto.ActionTypeProto;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,8 +45,8 @@ import java.util.stream.Collectors;
 public class EventService {
     private final EventRepository eventRepository;
     private final EventMapper eventMapper;
-    private final StatsClient statsClient;
-    private final HttpServletRequest request;
+    private final UserActionClient userActionClient;
+    private final RecommendationsClient recommendationsClient;
     private final EntityValidator entityValidator;
     private final UserFeignClient userFeignClient;
     private final RequestFeignClient requestFeignClient;
@@ -60,14 +60,9 @@ public class EventService {
             enrichWithCategories(dtos);
             enrichWithConfirmedRequests(dtos);
 
-            List<String> uris = dtos.stream()
-                    .map(d -> "/events/" + d.getId())
-                    .collect(Collectors.toList());
-            saveHit();
-            Map<String, Long> hits = fetchHitsForUris(uris);
-            for (EventShortDto dto : dtos) {
-                dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
-            }
+            List<Long> ids = dtos.stream().map(EventShortDto::getId).collect(Collectors.toList());
+            Map<Long, Double> ratings = fetchRatings(ids);
+            dtos.forEach(dto -> dto.setRating(ratings.getOrDefault(dto.getId(), 0.0)));
         }
 
         return dtos != null ? dtos : Collections.emptyList();
@@ -169,9 +164,8 @@ public class EventService {
             enrichWithCategory(dto);
             setConfirmedRequestsForEvents(List.of(dto));
 
-            String uri = "/events/" + dto.getId();
-            Map<String, Long> hits = fetchHitsForUris(List.of(uri));
-            dto.setViews(hits.getOrDefault(uri, 0L));
+            Map<Long, Double> ratings = fetchRatings(List.of(dto.getId()));
+            dto.setRating(ratings.getOrDefault(dto.getId(), 0.0));
         }
         return dto;
     }
@@ -191,13 +185,9 @@ public class EventService {
             enrichWithCategories(eventDtos);
             enrichWithConfirmedRequests(eventDtos);
 
-            List<String> uris = eventDtos.stream()
-                    .map(d -> "/events/" + d.getId())
-                    .collect(Collectors.toList());
-            Map<String, Long> hits = fetchHitsForUris(uris);
-            for (EventShortDto dto : eventDtos) {
-                dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
-            }
+            List<Long> ids = eventDtos.stream().map(EventShortDto::getId).collect(Collectors.toList());
+            Map<Long, Double> ratings = fetchRatings(ids);
+            eventDtos.forEach(dto -> dto.setRating(ratings.getOrDefault(dto.getId(), 0.0)));
         }
 
         Map<Long, EventShortDto> eventMap = eventDtos != null ?
@@ -267,31 +257,25 @@ public class EventService {
             enrichWithInitiators(dtos);
             enrichWithCategories(dtos);
             enrichWithConfirmedRequests(dtos);
-
-            List<String> uris = dtos.stream()
-                    .map(d -> "/events/" + d.getId())
-                    .collect(Collectors.toList());
-
-            Map<String, Long> hits = fetchHitsForUris(uris);
-            for (EventShortDto dto : dtos) {
-                dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
-            }
         } else {
             dtos = Collections.emptyList();
         }
 
-        saveHit();
+        List<Long> eventIds = dtos.stream().map(EventShortDto::getId).collect(Collectors.toList());
+        Map<Long, Double> ratings = fetchRatings(eventIds);
+        for (EventShortDto dto : dtos) {
+            dto.setRating(ratings.getOrDefault(dto.getId(), 0.0));
+        }
 
         if (filter.getSort() != null && filter.getSort() == EventSort.VIEWS && !dtos.isEmpty()) {
-            dtos.sort(Comparator.comparing(EventShortDto::getViews).reversed());
+            dtos.sort(Comparator.comparing(EventShortDto::getRating).reversed());
         }
 
         return dtos;
     }
 
-    public EventFullDto findPublicEventById(long id) {
+    public EventFullDto findPublicEventById(long id, long userId) {
         Event event = findByPublicId(id);
-        saveHit();
         EventFullDto dto = eventMapper.toEventFullDto(event);
 
         if (dto != null) {
@@ -299,10 +283,14 @@ public class EventService {
             enrichWithCategory(dto);
             setConfirmedRequestsForEvents(List.of(dto));
 
-            String uri = "/events/" + dto.getId();
-            Map<String, Long> hits = fetchHitsForUris(List.of(uri));
-            dto.setViews(hits.getOrDefault(uri, 0L));
+            try {
+                userActionClient.sendUserAction(userId, id, ActionTypeProto.ACTION_VIEW, Instant.now());
+            } catch (Exception e) {
+                log.warn("Failed to send VIEW action: {}", e.getMessage());
+            }
 
+            Map<Long, Double> ratings = fetchRatings(List.of(dto.getId()));
+            dto.setRating(ratings.getOrDefault(dto.getId(), 0.0));
         }
 
         return dto;
@@ -322,18 +310,64 @@ public class EventService {
             enrichWithCategoriesForFullDto(dtos);
             setConfirmedRequestsForEvents(dtos);
 
-            List<String> uris = dtos.stream()
-                    .map(d -> "/events/" + d.getId())
-                    .collect(Collectors.toList());
-            Map<String, Long> hits = fetchHitsForUris(uris);
-            for (EventFullDto dto : dtos) {
-                dto.setViews(hits.getOrDefault("/events/" + dto.getId(), 0L));
-            }
+            List<Long> ids = dtos.stream().map(EventFullDto::getId).collect(Collectors.toList());
+            Map<Long, Double> ratings = fetchRatings(ids);
+            dtos.forEach(dto -> dto.setRating(ratings.getOrDefault(dto.getId(), 0.0)));
         } else {
             dtos = Collections.emptyList();
         }
 
         return dtos;
+    }
+
+    public List<EventShortDto> getRecommendations(long userId, int maxResults) {
+        List<Long> eventIds = recommendationsClient
+                .getRecommendationsForUser(userId, maxResults)
+                .map(r -> r.getEventId())
+                .collect(Collectors.toList());
+
+        if (eventIds.isEmpty()) return Collections.emptyList();
+
+        List<Event> events = eventRepository.findAllById(eventIds);
+        List<EventShortDto> dtos = eventMapper.toEventsShortDto(events);
+
+        if (dtos != null && !dtos.isEmpty()) {
+            enrichWithInitiators(dtos);
+            enrichWithCategories(dtos);
+            enrichWithConfirmedRequests(dtos);
+
+            Map<Long, Double> ratings = fetchRatings(eventIds);
+            dtos.forEach(dto -> dto.setRating(ratings.getOrDefault(dto.getId(), 0.0)));
+        }
+
+        return dtos != null ? dtos : Collections.emptyList();
+    }
+
+    public void likeEvent(long userId, long eventId) {
+        boolean visited = requestFeignClient.hasConfirmedRequest(userId, eventId);
+        if (!visited) {
+            throw new InvalidRequestException("Пользователь не посещал мероприятие " + eventId);
+        }
+        try {
+            userActionClient.sendUserAction(userId, eventId, ActionTypeProto.ACTION_LIKE, Instant.now());
+        } catch (Exception e) {
+            log.warn("Failed to send LIKE action: {}", e.getMessage());
+        }
+    }
+
+    private Map<Long, Double> fetchRatings(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) return Map.of();
+        try {
+            return recommendationsClient.getInteractionsCount(eventIds)
+                    .collect(Collectors.toMap(
+                            r -> r.getEventId(),
+                            r -> r.getScore(),
+                            (a, b) -> a
+                    ));
+        } catch (Exception e) {
+            log.error("Failed to fetch ratings: {}", e.getMessage());
+            return Map.of();
+        }
     }
 
     private void setConfirmedRequestsForEvents(List<EventFullDto> dtos) {
@@ -549,35 +583,6 @@ public class EventService {
         } catch (Exception ex) {
             log.error("Failed to enrich with confirmed requests", ex);
             events.forEach(event -> event.setConfirmedRequests(0));
-        }
-    }
-
-    private void saveHit() {
-        try {
-            EndpointHitDto hitDto = EndpointHitDto.builder()
-                    .app("ewm-main-service")
-                    .uri(request.getRequestURI())
-                    .ip(request.getRemoteAddr())
-                    .timestamp(LocalDateTime.now())
-                    .build();
-
-            statsClient.saveHit(hitDto);
-        } catch (Exception e) {
-            log.error("Не удалось отправить информацию о просмотре в сервис статистики: {}", e.getMessage());
-        }
-    }
-
-    private Map<String, Long> fetchHitsForUris(List<String> uris) {
-        try {
-            LocalDateTime start = LocalDateTime.now().minusYears(10);
-            LocalDateTime end = LocalDateTime.now().plusDays(1);
-            List<ViewStatsDto> stats = statsClient.getStats(start, end, uris, true);
-            if (stats == null || stats.isEmpty()) return Map.of();
-            return stats.stream().collect(Collectors.toMap(
-                    ViewStatsDto::getUri, v -> v.getHits() == null ? 0L : v.getHits()));
-        } catch (Exception e) {
-            log.error("Не удалось получить просмотры из сервиса статистики: {}", e.getMessage());
-            return Map.of();
         }
     }
 }

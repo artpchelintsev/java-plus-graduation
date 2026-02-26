@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS requests CASCADE;
+DROP TYPE IF EXISTS request_status CASCADE;
+
 -- Создаем enum тип для статуса запроса
 CREATE TYPE request_status AS ENUM ('PENDING', 'CONFIRMED', 'REJECTED', 'CANCELED');
 
