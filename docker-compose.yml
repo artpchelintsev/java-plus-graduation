@@ -146,11 +146,11 @@ services:
     ports:
       - "6545:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=analyzer
+      - POSTGRES_USER=explorewithme
+      - POSTGRES_PASSWORD=explorewithme
+      - POSTGRES_DB=explorewithme
     healthcheck:
-      test: "pg_isready -q -d analyzer -U postgres"
+      test: "pg_isready -q -d explorewithme -U explorewithme"
       interval: 5s
       timeout: 3s
       retries: 10
@@ -300,9 +300,9 @@ services:
       - EUREKA_INSTANCE_PREFERIPADDRESS=true
       - SPRING_CONFIG_IMPORT=configserver:http://config-server:8888
       - SPRING_CLOUD_CONFIG_DISCOVERY_ENABLED=false
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://analyzer-db:5432/analyzer
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://analyzer-db:5432/explorewithme
+      - SPRING_DATASOURCE_USERNAME=explorewithme
+      - SPRING_DATASOURCE_PASSWORD=explorewithme
       - SPRING_APPLICATION_JSON={"kafka":{"similarity-consumer":{"properties":{"bootstrap.servers":"kafka:9092"}},"action-consumer":{"properties":{"bootstrap.servers":"kafka:9092"}}}}
       - JAVA_TOOL_OPTIONS=-Dio.grpc.netty.shaded.io.netty.transport.noNative=true
     depends_on:
