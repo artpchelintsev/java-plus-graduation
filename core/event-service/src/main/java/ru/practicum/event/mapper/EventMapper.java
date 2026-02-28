@@ -18,14 +18,14 @@ public interface EventMapper {
     @Mapping(target = "category", source = "categoryId", qualifiedByName = "mapCategoryIdToDto")
     @Mapping(target = "initiator", source = "initiatorId", qualifiedByName = "mapInitiatorIdToDto")
     @Mapping(target = "confirmedRequests", ignore = true)
-    @Mapping(target = "views", ignore = true)
+    @Mapping(target = "rating", ignore = true)
     EventFullDto toEventFullDto(Event event);
 
     @Mapping(target = "id", source = "id")
     @Mapping(target = "category", source = "categoryId", qualifiedByName = "mapCategoryIdToDto")
     @Mapping(target = "initiator", source = "initiatorId", qualifiedByName = "mapInitiatorIdToDto")
     @Mapping(target = "confirmedRequests", ignore = true)
-    @Mapping(target = "views", ignore = true)
+    @Mapping(target = "rating", ignore = true)
     @Mapping(target = "eventDate", source = "eventDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
     EventShortDto toEventShortDto(Event event);
 

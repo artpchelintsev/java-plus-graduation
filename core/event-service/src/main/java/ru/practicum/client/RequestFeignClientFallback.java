@@ -32,4 +32,10 @@ public class RequestFeignClientFallback implements RequestFeignClient {
         log.error("Request Service unavailable for status change");
         throw new RuntimeException("Request Service is temporarily unavailable");
     }
+
+    @Override
+    public boolean hasConfirmedRequest(long userId, long eventId) {
+        log.warn("Request Service unavailable, returning false for hasConfirmedRequest");
+        return false;
+    }
 }

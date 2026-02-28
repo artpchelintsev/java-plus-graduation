@@ -44,4 +44,6 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
     void deleteByEventId(Long eventId);
 
     void deleteByRequesterId(Long requesterId);
+
+    boolean existsByEventIdAndRequesterIdAndStatus(Long eventId, Long requesterId, RequestStatus status);
 }
